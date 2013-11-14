@@ -5,21 +5,28 @@
 module Data.Thorn.Fmap (
     autofmap
   , Variance(..)
-  , autovariance
+  , autovariance, autovarianceRaw, autofunctorize
   ) where
 
 import Data.Thorn.Internal
 import Language.Haskell.TH
 import Data.List
 import Data.Maybe
+import qualified Data.Sequence as S
+import qualified Data.Foldable as F
 import Control.Monad
 import Control.Applicative
 import Control.Monad.State
 import Data.Monoid
+import Data.Functor
+import Data.Functor.Contravariant
+import Data.Bifunctor
+import Data.Profunctor
 
 -- |
 -- @autofmap t@ generates the @fmap@ of the type @t@.
--- Quite surprisingly, it still works for any arity, co\/contra\/free\/fixed-variances, type synonyms, and mutual recursions.
+-- 
+-- Quite surprisingly, it still works for any arities, co\/contra\/free\/fixed-variances, partially applied types, type synonyms, and mutual recursions.
 --
 -- @
 --type Nuf x y = y -> x
@@ -58,7 +65,8 @@ autofmap' tx = do
          Just (_,nm,_) -> return (VarE nm)
          Nothing -> autofmap'' tx
 autofmap'' (VarTx _) = return $ mkNameE "id"
-autofmap'' (FuncTx _) = fail "* -> k"
+autofmap'' (BasicTx _) = return $ mkNameE "id"
+autofmap'' (FuncTx _) = fail "Automap doesn't accept such a type with a kind * -> k."
 autofmap'' (DataTx nm vmp cxs) = do
     txnmes <- get
     put ((tx0, newFmap (length txnmes), Nothing) : txnmes)
@@ -72,9 +80,8 @@ autofmap'' (DataTx nm vmp cxs) = do
           go (InfixCx nm txa txb) = do
               [ea,eb] <- autofmapmap [txa,txb]
               return $ Match (InfixP (newVarP 0) nm (newVarP 1)) (NormalB (InfixE (Just ea) (ConE nm) (Just eb))) []
-          apps e es = foldl (\e es -> AppE e es) e es
           tx0 = SeenDataTx nm vmp
-autofmap'' (SeenDataTx nm vmp) = fail "Autofmap doesn't work well, sorry"
+autofmap'' (SeenDataTx nm vmp) = fail "Autofmap doesn't work well, sorry."
 autofmap'' (TupleTx txs) = do
     es <- autofmapmap txs
     return $ LamE [TupP (map newVarP [0..length txs-1])] (TupE es)
@@ -84,19 +91,23 @@ autofmap'' (ArrowTx txa txb) = do
     fb <- autofmap' txb
     return $ LamE [newVarP 0, newVarP 1] (AppE fb (AppE (newVarE 0) (AppE fa (newVarE 1))))
 autofmap'' (ListTx tx) = autofmap' tx >>= \f -> return $ AppE (mkNameE "map") f
-autofmap'' (SpecialTx n) = return $ VarE (newFunc n)
+autofmap'' (SpecialTx n) = return $ newFuncE n
 
 autofmapmap txs = mapM (\(i,tx) -> autofmap' tx >>= \e -> return $ AppE e (newVarE i)) (zip [0 .. length txs - 1] txs)
 
 -- |
 -- @Variance@ is a variance of a parameter of a functor.
--- @Co@ means covariance, one of a normal functor, 
--- @Contra@ means contravariance, a dual of covariance, 
--- @Free@ means to be able to satisfy either covariance or contravariance, 
--- @Fixed@ means to have to satisfy both covariance and contravariance.
--- And @v1 `mappend` v2@ means to have to satisfy both @v1@ and @v2@.
-data Variance = Co | Contra | Free | Fixed deriving (Show, Read)
+data Variance =
+    -- | Covariance, one of a normal functor.
+    Co
+    -- | Contravariance, a dual of covariance.
+  | Contra
+    -- | Free-variance, or novariance, being supposed to satisfy either covariance or contravariance.
+  | Free
+    -- | Fixed-variance, or invariance, being suppoesed to satisfy both covariance and contravariance.
+  | Fixed deriving (Show, Read)
 
+-- | @v1 `mappend` v2@ means to be supposed to satisfy both @v1@ and @v2@.
 instance Monoid Variance where
     Free `mappend` v = v
     v `mappend` Free = v
@@ -106,10 +117,56 @@ instance Monoid Variance where
     Contra `mappend` Co = Fixed
     mempty = Free
 
+neg :: Variance -> Variance
+neg Co = Contra
+neg Contra = Co
+neg Free = Free
+neg Fixed = Fixed
+
 -- |
 -- @autovariance t@ provides you the variances.
-autovariance :: TypeQ -> Q [Variance]
+autovariance :: TypeQ -> ExpQ
 autovariance t = do
+    vs <- autovarianceRaw t
+    return $ ListE (map go vs)
+    where go Co = mkNameCE "Co"
+          go Contra = mkNameCE "Contra"
+          go Free = mkNameCE "Free"
+          go Fixed = mkNameCE "Fixed"
+
+-- |
+-- @autovarianceRaw t@ provides you the raw variance list in Q monad.
+autovarianceRaw :: TypeQ -> Q [Variance]
+autovarianceRaw t = do
     (n,tx) <- t >>= normalizeType [] [] >>= apply 0
-    fail "oh"
+    (_,seq) <- runStateT (autovariance' Co [] tx) (S.replicate n Free)
+    return $ (F.toList seq)
+
+autovariance' :: Variance -> [(Name,[Conx])] -> Typex -> StateT (S.Seq Variance) Q ()
+autovariance' v dts (SpecialTx n) = do
+    seq <- get
+    put $ S.adjust (<>v) n seq
+autovariance' v dts (VarTx _) = return ()
+autovariance' v dts (FuncTx _) = fail "Automap doesn't accept such a type with a kind * -> k."
+autovariance' v dts (DataTx nm _ cxs) = mapM_ (mapM_ (autovariance' v ((nm,cxs):dts)) . cxtxs) cxs
+autovariance' v dts (SeenDataTx nm _) = return ()
+autovariance' v dts (TupleTx txs) = mapM_ (autovariance' v dts) txs
+autovariance' v dts (ArrowTx txa txb) = autovariance' (neg v) dts txa >> autovariance' v dts txb
+autovariance' v dts (ListTx tx) = autovariance' v dts tx
+
+-- |
+-- @autofunctorize t@ provides an instance delcaration of @t@ for the suitable functor class : Funtor, Contravariant, Bifunctor, or Profunctor
+autofunctorize :: TypeQ -> DecsQ
+autofunctorize t = do
+    vs <- autovarianceRaw t
+    case vs of
+         [Co] -> go (mkName "Functor") (mkName "fmap")
+         [Contra] -> go (mkName "Contravariant") (mkName "contramap")
+         [Co,Co] -> go (mkName "Bifunctor") (mkName "bimap")
+         [Contra,Co] -> go (mkName "Profunctor") (mkName "dimap")
+         _ -> fail "autofunctorize doesn't know the suitable functor class for this variance"
+    where go cls member = do
+              e <- autofmap t
+              t' <- t
+              return [InstanceD [] (AppT (ConT cls) t') [ValD (VarP member) (NormalB e) []]]
 

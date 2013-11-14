@@ -2,12 +2,19 @@
 
 -- |
 -- Thorn, a template haskell library.
--- Re-exports of modules.
 module Data.Thorn (
-    module Data.Thorn.Fmap
-  , module Data.Thorn.Fold
+    autofmap
+  , Variance(..)
+  , autovariance, autofunctorize
+
+  , unfixdata
+  , autofold, autoMutualFold
+  , autounfold, autoMutualUnfold
+
+  , autozipper
   ) where
 
 import Data.Thorn.Fmap
 import Data.Thorn.Fold
+import Data.Thorn.Zipper
 
