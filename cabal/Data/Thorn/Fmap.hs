@@ -124,7 +124,7 @@ neg Free = Free
 neg Fixed = Fixed
 
 -- |
--- @autovariance t@ provides you the variances.
+-- @autovariance t@ provides the variances of the type @t@.
 autovariance :: TypeQ -> ExpQ
 autovariance t = do
     vs <- autovarianceRaw t
@@ -134,8 +134,6 @@ autovariance t = do
           go Free = mkNameCE "Free"
           go Fixed = mkNameCE "Fixed"
 
--- |
--- @autovarianceRaw t@ provides you the raw variance list in Q monad.
 autovarianceRaw :: TypeQ -> Q [Variance]
 autovarianceRaw t = do
     (n,tx) <- t >>= normalizeType [] [] >>= apply 0
@@ -155,7 +153,7 @@ autovariance' v dts (ArrowTx txa txb) = autovariance' (neg v) dts txa >> autovar
 autovariance' v dts (ListTx tx) = autovariance' v dts tx
 
 -- |
--- @autofunctorize t@ provides an instance delcaration of @t@ for the suitable functor class : Funtor, Contravariant, Bifunctor, or Profunctor
+-- @autofunctorize t@ provides an instance delcaration of the type @t@ for the suitable functor class : Funtor, Contravariant, Bifunctor, or Profunctor
 autofunctorize :: TypeQ -> DecsQ
 autofunctorize t = do
     vs <- autovarianceRaw t

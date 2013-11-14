@@ -3,15 +3,10 @@
 -- |
 -- Thorn, a template haskell library.
 module Data.Thorn (
+    -- * Data.Thorn.Fmap
     autofmap
   , Variance(..)
   , autovariance, autofunctorize
-
-  , unfixdata
-  , autofold, autoMutualFold
-  , autounfold, autoMutualUnfold
-
-  , autozipper
   ) where
 
 import Data.Thorn.Fmap
