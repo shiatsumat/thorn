@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell, ViewPatterns #-}
 
 -- |
--- The module Data.Thorn.Zipper
+-- The module Data.Thorn.Zipper.
 module Data.Thorn.Zipper (
     autozipper
   ) where

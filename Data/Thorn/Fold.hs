@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell, ViewPatterns #-}
 
 -- |
--- The module Data.Thorn.Fold
+-- The module Data.Thorn.Fold.
 module Data.Thorn.Fold (
     unfixdata
   , autofold, autoMutualFold

@@ -2,7 +2,7 @@ name: thorn
 synopsis: Template Haskell Library
 description: Template Haskell Library
 category: Data, Generics
-version: 0.1.0.1
+version: 0.1.0.3
 stability: experimental
 license: BSD3
 license-file: LICENSE
@@ -20,7 +20,7 @@ source-repository head
 
 library
     exposed-modules: Data.Thorn
-    other-modules: Data.Thorn.Fmap, Data.Thorn.Fold, Data.Thorn.Zipper, Data.Thorn.Internal
+    other-modules: Data.Thorn.Type, Data.Thorn.Functor
     build-depends:
         base >= 4 && < 5,
         template-haskell < 3,
@@ -29,5 +29,5 @@ library
         contravariant < 1,
         bifunctors < 5,
         profunctors < 5
-    ghc-options: --Wall
+    ghc-options: -Wall
     default-language: Haskell2010
