@@ -19,7 +19,7 @@ source-repository head
     location: git://github.com/Kinokkory/Thorn.git
 
 library
-    exposed-modules: Data.Thorn, Data.Thorn.FunctorExample, Data.Thorn.FoldExample
+    exposed-modules: Data.Thorn, Data.Thorn.FunctorExample, Data.Thorn.FoldExample, Main
     other-modules: Data.Thorn.Functor, Data.Thorn.Fold, Data.Thorn.Type
     build-depends:
         base >= 4 && < 5,

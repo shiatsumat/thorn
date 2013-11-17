@@ -1,24 +1,31 @@
-{-# LANGUAGE TemplateHaskell, TypeOperators #-}
+{-# LANGUAGE TemplateHaskell, TypeOperators, StandaloneDeriving #-}
 
 module Main (module Main) where
 
 import Data.Thorn
 
-data x :$ y = Nil | (x,y) :* (x :$ y)
+data x :$ y = Nil | (x,y) :* (x :$ y) deriving Show
 
 unfixdata [t|(:$)|]
 
-insth = $(autoin [t|(:&$)|] [t|(:$)|])
-outsth = $(autoout [t|(:&$)|] [t|(:$)|])
-hylosth = $(autohylo [t|(:&$)|])
+deriving instance (Show a, Show b, Show c) => Show ((:&$) a b c)
+
 foldsth = $(autofold [t|(:&$)|] [t|(:$)|])
 unfoldsth = $(autounfold [t|(:&$)|] [t|(:$)|])
 
-data Rose x = Rose x [Rose x]
---data Forest x = Forest [Rose x]
+f 0 = UfNil
+f n = (n,n) :&* (n-1)
+ff = unfoldsth f (5 :: Int)
 
-unfixdata [t|Rose|]
+g UfNil = 0
+g ((m,n) :&* k) = m+n+k
+gg = foldsth g ff
 
-main :: IO ()
-main = print (0 :: Int)
+data Rose x = Rose x (Forest x)
+data Forest x = Forest [Rose x]
+
+unfixdataMutual [[t|Rose|], [t|Forest|]]
+(inrose,inforest) = $(autoinMutual [([t|UfRose|],[t|Rose|]),([t|UfForest|],[t|Forest|])])
+
+main = print gg
 

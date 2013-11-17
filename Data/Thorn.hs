@@ -4,13 +4,18 @@ module Data.Thorn (
     -- * Functor
     -- $functor
     autofmap
+    -- ** Variance
   , Variance(..)
   , autovariance, autofunctorize
     
     -- * Folding and Unfolding
     -- $fold
-  , unfixdata, unfixdataEx
-  , autoin, autoout, autohylo, autofold, autounfold
+  , unfixdata, unfixdataEx, autofold, autounfold
+    -- ** Mutual Recursion
+  , unfixdataMutual, unfixdataMutualEx, autofoldMutual, autounfoldMutual
+    -- ** Primitive Functions
+  , autoin, autoout, autohylo
+  , autoinMutual, autooutMutual, autohyloMutual
 
     -- * Type Variants
     -- $typevariants
@@ -30,23 +35,28 @@ import Data.Thorn.Functor
 import Data.Thorn.Fold
 
 {- $functor
-    Thorn generates functors from various kinds of data types.
+    Thorn generates functors from various kinds of datatypes.
 
     Quite surprisingly, it still works for any arities, co\/contra\/free\/fixed-variances, partially applied types, type synonyms, and mutual recursions.
 
-    For more information, see <Data-Thorn.html#FunctorExample Functor Example>.
+    For more information, see <Data-Thorn.html#functorexample Functor Example>.
 -}
 
 {- $fold
-    For more information, see <Data-Thorn.html#FoldExample Folding and Unfolding Example>.
+    Thorn generates folding and unfolding functions from various kinds of recursive datatypes. It also supports mutually recursive datatypes.
+
+    For more information, see <Data-Thorn.html#foldexample Folding and Unfolding Example>.
 -}
 
 {- $typevariants
-    These types are used for representing type variants. For more information, see <Data-Thorn.html#FunctorExample Functor Example>.
+    These types are used for representing type variants. For more information, see <Data-Thorn.html#functorexample Functor Example>.
 -}
 
 {- $functorexample
-   #FunctorExample#
+
+   #functorexample#
+
+   "Data.Thorn.FunctorExample"
 
 > import Data.Thorn
 > import Data.Char
@@ -103,12 +113,13 @@ import Data.Thorn.Fold
 > autofunctorize [t|Rose|] -- instance Functor Rose where ...
 > autofunctorize [t|Forest|] -- instance Functor Forest where ...
 
-
-
 -}
 
 {- $foldexample
-   #FoldExample#
+
+   #foldexample#
+
+   "Data.Thorn.FoldExample"
 
 > import Data.Thorn
 > 

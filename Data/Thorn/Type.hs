@@ -9,11 +9,12 @@ module Data.Thorn.Type (
   , mkNameE, mkNameCE, mkNameP
   , applistE, applistT
   , Typex(..)
-  , Conx(..)
+  , Conx
   , cxtxs
   , type2typex, typex2type, normalizetype
   , T0, T1, T2, T3, T4, T5, T6, T7, T8, T9
   , applySpecial, applyFixed
+  , debug
   ) where
 
 import Language.Haskell.TH
@@ -238,4 +239,7 @@ applyFixed n tx@(SeenDataTx _ _) = return (n,tx)
 applyFixed n tx@(TupleTx _) = return (n,tx)
 applyFixed n tx@(ArrowTx _ _) = return (n,tx)
 applyFixed n tx@(ListTx _) = return (n,tx)
+
+debug :: Show a => a -> DecsQ
+debug a = runIO (print a) >> return []
 

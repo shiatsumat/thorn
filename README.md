@@ -1,4 +1,4 @@
 Thorn
 =====
 
-Type and Data Manipulation with Template Haskell
+Datatype Manipulation with Template Haskell
