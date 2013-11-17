@@ -13,81 +13,59 @@ import Language.Haskell.TH
 import Data.List
 import qualified Data.Sequence as S
 import qualified Data.Foldable as F
-import Control.Monad
 import Control.Applicative
 import Control.Monad.State
 import Data.Monoid
 
-newVar,newFunc,newFmap :: Int -> Name
-newVar n = mkName $ "thornvariant" ++ show n
-newVarP = VarP . newVar
-newVarE = VarE . newVar
-newFunc n = mkName $ "thornfunction" ++ show n
-newFuncP = VarP . newFunc
-newFuncE = VarE . newFunc
-newFmap n = mkName $ "thornfmap" ++ show n
-newFmapP = VarP . newFmap
-newFmapE = VarE . newFmap
-
 -- |
 -- @autofmap t@ generates the @fmap@ of the type @t@.
--- 
--- Quite surprisingly, it still works for any arities, co\/contra\/free\/fixed-variances, partially applied types, type synonyms, and mutual recursions.
 autofmap :: TypeQ -> ExpQ
 autofmap t = do
-    (n,tx) <- t >>= type2typex [] [] >>= apply 0
-    (e,txnmes) <- runStateT (autofmap' tx) []
-    return $ LamE (map newFuncP [0..n-1]) (LetE (fmap (\(_,nm,Just e) -> ValD (VarP nm) (NormalB e) []) txnmes) e)
+    (n,tx) <- t >>= type2typex [] [] >>= applySpecial 0
+    u <- unique
+    (e,txnmes) <- runStateT (autofmap' u tx) []
+    return $ LamE (map newFuncP [u..u+n-1]) (LetE (fmap (\(_,nm,Just e') -> ValD (VarP nm) (NormalB e') []) txnmes) e)
 
-apply :: Int -> Typex -> Q (Int,Typex)
-apply n (FuncTx f) = f (SpecialTx n) >>= apply (n+1)
-apply n tx@(VarTx _) = return (n,tx)
-apply n tx@(BasicTx _) = return (n,tx)
-apply n tx@(SpecialTx _) = return (n,tx)
-apply n tx@(FixedTx _) = return (n,tx)
-apply n tx@(DataTx _ _ _) = return (n,tx)
-apply n tx@(SeenDataTx _ _) = return (n,tx)
-apply n tx@(TupleTx _) = return (n,tx)
-apply n tx@(ArrowTx _ _) = return (n,tx)
-apply n tx@(ListTx _) = return (n,tx)
-
-autofmap',autofmap'' :: Typex -> StateT [(Typex,Name,Maybe Exp)] Q Exp
-autofmap' tx = do
+autofmap',autofmap'' :: Unique -> Typex -> StateT [(Typex,Name,Maybe Exp)] Q Exp
+autofmap' u tx = do
     txnmes <- get
     case find (\(tx',_,_)->tx==tx') txnmes of
          Just (_,nm,_) -> return (VarE nm)
-         Nothing -> autofmap'' tx
-autofmap'' (VarTx _) = return $ mkNameE "id"
-autofmap'' (BasicTx _) = return $ mkNameE "id"
-autofmap'' (FixedTx _) = return $ mkNameE "id"
-autofmap'' (FuncTx _) = fail "Automap doesn't accept such a type with a kind * -> k."
-autofmap'' (DataTx nm vmp cxs) = do
+         Nothing -> autofmap'' u tx
+autofmap'' _ (VarTx _) = return $ mkNameE "id"
+autofmap'' _ (BasicTx _) = return $ mkNameE "id"
+autofmap'' _ (FixedTx _) = return $ mkNameE "id"
+autofmap'' _ NotTx = fail "Thorn doesn't work well, sorry."
+autofmap'' _ (FuncTx _) = fail "Thorn doesn't accept such a type with a kind * -> k, sorry."
+autofmap'' u (DataTx nm vmp cxs) = do
     txnmes <- get
     put ((tx0, newFmap (length txnmes), Nothing) : txnmes)
-    e <- LamE [newVarP 0] <$> (CaseE (newVarE 0) <$> (mapM go cxs))
+    u2 <- unique
+    e <- LamE [newVarP u2] <$> (CaseE (newVarE u2) <$> (mapM go cxs))
     txnmes' <- get
-    put $ map (\(tx,nm,e') -> if tx==tx0 then (tx,nm,Just e) else (tx,nm,e')) txnmes'
+    put $ map (\(tx,nm',e') -> if tx==tx0 then (tx,nm',Just e) else (tx,nm',e')) txnmes'
     return e
-    where go (NormalCx nm txs) = do
-              es <- autofmapmap txs
-              return $ Match (ConP nm (map newVarP [0..length txs-1])) (NormalB (applistE (ConE nm) es)) []
-          go (InfixCx nm txa txb) = do
-              [ea,eb] <- autofmapmap [txa,txb]
-              return $ Match (InfixP (newVarP 0) nm (newVarP 1)) (NormalB (InfixE (Just ea) (ConE nm) (Just eb))) []
+    where go (nm',txs) = do
+              (u2,es) <- autofmapmap u txs
+              return $ Match (ConP nm' (map newVarP [u2..u2+length txs-1])) (NormalB (applistE (ConE nm') es)) []
           tx0 = SeenDataTx nm vmp
-autofmap'' (SeenDataTx _ _) = fail "Autofmap doesn't work well, sorry."
-autofmap'' (TupleTx txs) = do
-    es <- autofmapmap txs
-    return $ LamE [TupP (map newVarP [0..length txs-1])] (TupE es)
-autofmap'' (ArrowTx txa txb) = do
-    fa <- autofmap' txa
-    fb <- autofmap' txb
-    return $ LamE [newVarP 0, newVarP 1] (AppE fb (AppE (newVarE 0) (AppE fa (newVarE 1))))
-autofmap'' (ListTx tx) = autofmap' tx >>= \f -> return $ AppE (mkNameE "map") f
-autofmap'' (SpecialTx n) = return $ newFuncE n
+autofmap'' _ (SeenDataTx _ _) = fail "Thorn doesn't work well, sorry."
+autofmap'' u (TupleTx txs) = do
+    (u2,es) <- autofmapmap u txs
+    return $ LamE [TupP (map newVarP [u2..u2+length txs-1])] (TupE es)
+autofmap'' u (ArrowTx txa txb) = do
+    fa <- autofmap' u txa
+    fb <- autofmap' u txb
+    u2 <- unique
+    return $ LamE [newVarP u2, newVarP (u2+1)] (AppE fb (AppE (newVarE u2) (AppE fa (newVarE (u2+1)))))
+autofmap'' u (ListTx tx) = autofmap' u tx >>= \f -> return $ AppE (mkNameE "map") f
+autofmap'' u (SpecialTx n) = return $ newFuncE (u+n)
 
-autofmapmap :: [Typex] -> StateT [(Typex,Name,Maybe Exp)] Q [Exp]
-autofmapmap txs = mapM (\(i,tx) -> autofmap' tx >>= \e -> return $ AppE e (newVarE i)) (zip [0 .. length txs - 1] txs)
+autofmapmap :: Unique -> [Typex] -> StateT [(Typex,Name,Maybe Exp)] Q (Unique,[Exp])
+autofmapmap u txs = do
+    u2 <- unique
+    es <- mapM (\(i,tx) -> autofmap' u tx >>= \e -> return $ AppE e (newVarE i)) (zip [u2..u2+length txs-1] txs)
+    return (u2,es)
 
 -- |
 -- @Variance@ is a variance of a parameter of a functor.
@@ -140,23 +118,25 @@ autovariance t = do
 
 autovarianceRaw :: TypeQ -> Q [Variance]
 autovarianceRaw t = do
-    (n,tx) <- t >>= type2typex [] [] >>= apply 0
+    (n,tx) <- t >>= type2typex [] [] >>= applySpecial 0
     (_,sq) <- runStateT (autovariance' Co [] tx) (S.replicate n Free)
     return $ (F.toList sq)
 
 autovariance' :: Variance -> [(Name,[Conx],Variance)] -> Typex -> StateT (S.Seq Variance) Q ()
+autovariance' _ _ (VarTx _) = return ()
+autovariance' _ _ (BasicTx _) = return ()
 autovariance' v _ (SpecialTx n) = do
     sq <- get
     put $ S.adjust (<>v) n sq
-autovariance' _ _ (VarTx _) = return ()
-autovariance' _ _ (BasicTx _) = return ()
 autovariance' _ _ (FixedTx _) = return ()
-autovariance' _ _ (FuncTx _) = fail "Automap doesn't accept such a type with a kind * -> k."
+autovariance' _ _ NotTx = fail "Thorn doesn't work well, sorry."
+autovariance' _ _ (FuncTx _) = fail "Thorn doesn't accept such a type with a kind * -> k, sorry."
 autovariance' v dts (DataTx nm _ cxs) = mapM_ (mapM_ (autovariance' v ((nm,cxs,v):dts)) . cxtxs) cxs
 autovariance' v dts (SeenDataTx nm _)
     | v' `includes` v = return ()
-    | otherwise = mapM_ (mapM_ (autovariance' v ((nm,cxs,v):dts)) . cxtxs) cxs
+    | otherwise = mapM_ (mapM_ (autovariance' v dts') . cxtxs) cxs
     where Just (_,cxs,v') = find (\(nm',_,_) -> nm==nm') dts
+          dts' = map (\tpl@(nm',_,_) -> if nm==nm' then (nm',cxs,v<>v') else tpl) dts
 autovariance' v dts (TupleTx txs) = mapM_ (autovariance' v dts) txs
 autovariance' v dts (ArrowTx txa txb) = autovariance' (neg v) dts txa >> autovariance' v dts txb
 autovariance' v dts (ListTx tx) = autovariance' v dts tx
@@ -173,7 +153,7 @@ autofunctorize t = do
          [Co,Co] -> bifunctor
          [Contra,Co] -> profunctor
          [Free,Co] -> (++) <$> bifunctor <*> profunctor
-         _ -> fail "autofunctorize doesn't know the suitable functor class for this variance"
+         _ -> fail "Thorn doesn't know any suitable functor class for this variance, sorry."
     where go cls member = do
               e <- autofmap t
               t' <- normalizetype =<< t

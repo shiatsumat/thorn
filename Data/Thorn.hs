@@ -1,4 +1,4 @@
--- | Thorn, a template haskell library.
+-- | Thorn, Datatype Manipulation with Template Haskell.
 
 module Data.Thorn (
     -- * Functor
@@ -9,6 +9,8 @@ module Data.Thorn (
     
     -- * Folding and Unfolding
     -- $fold
+  , unfixdata, unfixdataEx
+  , autoin, autoout, autohylo, autofold, autounfold
 
     -- * Type Variants
     -- $typevariants
@@ -25,8 +27,13 @@ module Data.Thorn (
 
 import Data.Thorn.Type
 import Data.Thorn.Functor
+import Data.Thorn.Fold
 
 {- $functor
+    Thorn generates functors from various kinds of data types.
+
+    Quite surprisingly, it still works for any arities, co\/contra\/free\/fixed-variances, partially applied types, type synonyms, and mutual recursions.
+
     For more information, see <Data-Thorn.html#FunctorExample Functor Example>.
 -}
 
@@ -41,6 +48,12 @@ import Data.Thorn.Functor
 {- $functorexample
    #FunctorExample#
 
+> import Data.Thorn
+> import Data.Char
+> import Data.Functor.Contravariant
+> import Data.Bifunctor
+> import Data.Profunctor
+> 
 > type a :<- b = b -> a
 > nuf :: Char
 > nuf = $(autofmap [t|(:<-)|]) chr ord (+1) 'a' -- 'b'
@@ -67,13 +80,13 @@ import Data.Thorn.Functor
 > -- instance Bifunctor (What a) where ... and
 > -- instance Profunctor (What a) where ...
 > 
-> data List a = Nil | a :+ (List a) deriving Show
+> data List a = Nil | a :* (List a) deriving Show
 > fromNormalList :: [a] -> List a
 > fromNormalList [] = Nil
-> fromNormalList (a : as) = a :+ fromNormalList as
+> fromNormalList (a : as) = a :* fromNormalList as
 > toNormalList :: List a -> [a]
 > toNormalList Nil = []
-> toNormalList (a :+ as) = a : toNormalList as
+> toNormalList (a :* as) = a : toNormalList as
 > list :: [Int]
 > list = toNormalList $ $(autofmap [t|List|]) (+10) (fromNormalList [1..5]) -- [11..15]
 > varlist :: [Variance]
@@ -90,10 +103,23 @@ import Data.Thorn.Functor
 > autofunctorize [t|Rose|] -- instance Functor Rose where ...
 > autofunctorize [t|Forest|] -- instance Functor Forest where ...
 
+
+
 -}
 
 {- $foldexample
-   #FunctorExample#
-    yeah
+   #FoldExample#
+
+> import Data.Thorn
+> 
+> data x :$ y = Nil | (x,y) :* (x :$ y)
+> 
+> unfixdata [t|(:$)|]
+> 
+> insth = $(autoin [t|(:&$)|] [t|(:$)|])
+> outsth = $(autoout [t|(:&$)|] [t|(:$)|])
+> hylosth = $(autohylo [t|(:&$)|])
+> foldsth = $(autofold [t|(:&$)|] [t|(:$)|])
+> unfoldsth = $(autounfold [t|(:&$)|] [t|(:$)|])
 -}
 

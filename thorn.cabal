@@ -1,6 +1,6 @@
 name: thorn
-synopsis: Template Haskell Library
-description: Template Haskell Library
+synopsis: Datatype Manipulation with Template Haskell
+description: Datatype Manipulation with Template Haskell
 category: Data, Generics
 version: 0.1.0.3
 stability: experimental
@@ -19,10 +19,11 @@ source-repository head
     location: git://github.com/Kinokkory/Thorn.git
 
 library
-    exposed-modules: Data.Thorn
-    other-modules: Data.Thorn.Type, Data.Thorn.Functor
+    exposed-modules: Data.Thorn, Data.Thorn.FunctorExample, Data.Thorn.FoldExample
+    other-modules: Data.Thorn.Functor, Data.Thorn.Fold, Data.Thorn.Type
     build-depends:
         base >= 4 && < 5,
+        random > 1,
         template-haskell < 3,
         mtl < 3,
         containers < 1,

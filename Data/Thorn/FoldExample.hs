@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, TypeOperators #-}
 
-module Main (module Main) where
+module Data.Thorn.FoldExample (module Data.Thorn.FoldExample) where
 
 import Data.Thorn
 
@@ -13,12 +13,4 @@ outsth = $(autoout [t|(:&$)|] [t|(:$)|])
 hylosth = $(autohylo [t|(:&$)|])
 foldsth = $(autofold [t|(:&$)|] [t|(:$)|])
 unfoldsth = $(autounfold [t|(:&$)|] [t|(:$)|])
-
-data Rose x = Rose x [Rose x]
---data Forest x = Forest [Rose x]
-
-unfixdata [t|Rose|]
-
-main :: IO ()
-main = print (0 :: Int)
 
