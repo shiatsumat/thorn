@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- |
 -- The module Data.Thorn.Zipper.
@@ -6,8 +6,9 @@ module Data.Thorn.Zipper (
     autozipper
   ) where
 
-import Data.Thorn.Internal
-import Data.Thorn.Fmap
+import Data.Thorn.Type
+import Data.Thorn.Functor
+import Data.Thorn.Fold
 import Language.Haskell.TH
 
 autozipper :: TypeQ -> DecsQ

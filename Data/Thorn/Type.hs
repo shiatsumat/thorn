@@ -6,20 +6,21 @@ module Data.Thorn.Type (
   , newVar, newSubvar, newFunc, newFmap
   , newVarP, newSubvarP, newFuncP, newFmapP
   , newVarE, newSubvarE, newFuncE, newFmapE
-  , mkNameE, mkNameCE, mkNameP
-  , applistE, applistT
+  , mkNameE, mkNameCE, mkNameP, mkNameTx
+  , applistE, applistT, applistTx, appTx
   , Typex(..)
   , Conx
   , cxtxs
   , type2typex, typex2type, normalizetype
   , T0, T1, T2, T3, T4, T5, T6, T7, T8, T9
-  , applySpecial, applyFixed
-  , debug
+  , applySpecial, applyFixed, applyFixed'
+  , gendec1, gendec2, gendecs1
   ) where
 
 import Language.Haskell.TH
 import Data.List
 import Data.Maybe
+import Control.Monad
 import Control.Monad.Trans
 import Control.Applicative
 import System.Random
@@ -50,14 +51,22 @@ newFmapE = VarE . newFmap
 
 mkNameE, mkNameCE :: String -> Exp
 mkNameP :: String -> Pat
+mkNameTx :: String -> Typex
 mkNameE = VarE . mkName
 mkNameCE = ConE . mkName
 mkNameP = VarP . mkName
+mkNameTx = VarTx . mkName
 
 applistE :: Exp -> [Exp] -> Exp
 applistT :: Type -> [Type] -> Type
-applistE e es = foldl (\e' es' -> AppE e' es') e es
-applistT t ts = foldl (\t' ts' -> AppT t' ts') t ts
+applistTx :: Typex -> [Typex] -> TypexQ
+applistE e es = foldl (\e1 e2 -> AppE e1 e2) e es
+applistT t ts = foldl (\t1 t2 -> AppT t1 t2) t ts
+applistTx tx txs = foldM (\tx1 tx2 -> appTx tx1 tx2) tx txs
+
+appTx :: Typex -> Typex -> TypexQ
+appTx (FuncTx f) tx = f tx
+appTx _ _ = fail "appTx : Thorn doesn't work well, sorry."
 
 data Typex =
     VarTx Name
@@ -129,21 +138,21 @@ type2typex vmp dts (ConT nm)
           go (TyConI (NewtypeD _ _ tvs con _)) = ho (length tvs) []
             where ho 0 txs = fromData nm (zip (map nameTV tvs) (reverse txs)) dts [con]
                   ho n txs = return $ FuncTx $ \tx -> ho (n-1) (tx:txs)
-          go (PrimTyConI _ _ _) = fail "Thorn doesn't support such primitive types, sorry."
-          go (FamilyI _ _) = fail "Thorn doesn't support type families, sorry."
-          go _ = fail "Thorn doesn't work well, sorry."
+          go (PrimTyConI _ _ _) = fail "type2typex : Thorn doesn't support such primitive types, sorry."
+          go (FamilyI _ _) = fail "type2typex : Thorn doesn't support type families, sorry."
+          go _ = fail "type2typex : Thorn doesn't work well, sorry."
 type2typex _ _ (TupleT n) = go n []
     where go 0 txs = return $ TupleTx (reverse txs)
           go k txs = return $ FuncTx $ \tx -> go (k-1) (tx:txs)
 type2typex _ _ ArrowT = return $ FuncTx $ \txa -> return $ FuncTx $ \txb -> return $ ArrowTx txa txb
 type2typex _ _ ListT = return $ FuncTx $ \tx -> return $ ListTx tx
-type2typex _ _ _ = fail "Thorn doesn't support such types, sorry."
+type2typex _ _ _ = fail "type2typex : Thorn doesn't support such types, sorry."
 
 fromData :: Name -> VarMap -> Datas -> [Con] -> TypexQ
 fromData nm vmp dts cons = case find (\(nm',_)->nm==nm') dts of
         Just (_,vmp')
             | vmp == vmp' -> return $ SeenDataTx nm vmp
-            | otherwise -> fail "Thorn doesn't support irregular types, sorry."
+            | otherwise -> fail "fromData : Thorn doesn't support irregular types, sorry."
         Nothing -> DataTx nm vmp <$> mapM con2conx cons
     where dts' = (nm,vmp) : dts
           con2conx (NormalC nm' sts) = (,) nm' <$> mapM stype2typex sts
@@ -152,7 +161,7 @@ fromData nm vmp dts cons = case find (\(nm',_)->nm==nm') dts of
               txa <- stype2typex sta
               txb <- stype2typex stb
               return (nm',[txa,txb])
-          con2conx (ForallC _ _ _) = fail "Thorn doesn't support existential types, sorry."
+          con2conx (ForallC _ _ _) = fail "fromData : Thorn doesn't support existential types, sorry."
           stype2typex (_,t) = type2typex vmp dts' t
           vstype2typex (_,_,t) = type2typex vmp dts' t
 
@@ -202,7 +211,7 @@ data T9
 typevariants :: Q [Name]
 typevariants = mapM (\n -> getnm <$> (reify . mkName $ 'T' : show n)) ([0..9] :: [Int])
     where getnm (TyConI (DataD _ nm _ _ _)) = nm
-          getnm _ = error "Thorn doesn't work well, sorry."
+          getnm _ = error "typevariants : Thorn doesn't work well, sorry."
 
 istypevariant :: Name -> Q Bool
 istypevariant nm = do
@@ -240,6 +249,27 @@ applyFixed n tx@(TupleTx _) = return (n,tx)
 applyFixed n tx@(ArrowTx _ _) = return (n,tx)
 applyFixed n tx@(ListTx _) = return (n,tx)
 
-debug :: Show a => a -> DecsQ
-debug a = runIO (print a) >> return []
+applyFixed' :: Int -> Int -> Typex -> TypexQ
+applyFixed' k n tx@(FuncTx f)
+    | k==n = return tx
+    | otherwise = f (FixedTx n) >>= applyFixed' k (n+1)
+applyFixed' _ _ _ = fail "applyFixed' : Thorn doesn't work well, sorry."
+
+gendec1 :: (a -> ExpQ) -> (a -> TypeQ) -> String -> a -> DecsQ
+gendec1 f g s a = do
+    e <- f a
+    t <- g a
+    return [SigD (mkName s) t, ValD (mkNameP s) (NormalB e) []]
+
+gendec2 :: (a -> b -> ExpQ) -> (a -> b -> TypeQ) -> String -> a -> b -> DecsQ
+gendec2 f g s a b = do
+    e <- f a b
+    t <- g a b
+    return [SigD (mkName s) t, ValD (mkNameP s) (NormalB e) []]
+
+gendecs1 :: (a -> ExpQ) -> (a -> Q [Type]) -> [String] -> a -> DecsQ
+gendecs1 f g ss a = do
+    TupE es <- f a
+    ts <- g a
+    return $ concatMap (\(s,e,t) -> [SigD (mkName s) t, ValD (mkNameP s) (NormalB e) []]) (zip3 ss es ts)
 

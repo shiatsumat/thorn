@@ -10,8 +10,8 @@ unfixdata [t|(:$)|]
 
 deriving instance (Show a, Show b, Show c) => Show ((:&$) a b c)
 
-foldsth = $(autofold [t|(:&$)|] [t|(:$)|])
-unfoldsth = $(autounfold [t|(:&$)|] [t|(:$)|])
+$(autofolddec "foldsth" [t|(:&$)|] [t|(:$)|])
+$(autounfolddec "unfoldsth" [t|(:&$)|] [t|(:$)|])
 
 f 0 = UfNil
 f n = (n,n) :&* (n-1)
@@ -25,7 +25,8 @@ data Rose x = Rose x (Forest x)
 data Forest x = Forest [Rose x]
 
 unfixdataMutual [[t|Rose|], [t|Forest|]]
-(inrose,inforest) = $(autoinMutual [([t|UfRose|],[t|Rose|]),([t|UfForest|],[t|Forest|])])
+$(autofolddecMutual ["foldrose","foldforest"] [([t|(UfRose)|],[t|(Rose)|]),([t|(UfForest)|],[t|(Forest)|])])
+$(autounfolddecMutual ["unfoldrose","unfoldforest"] [([t|(UfRose)|],[t|(Rose)|]),([t|(UfForest)|],[t|(Forest)|])])
 
 main = print gg
 

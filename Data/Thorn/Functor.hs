@@ -3,34 +3,41 @@
 -- |
 -- The module Data.Thorn.Functor.
 module Data.Thorn.Functor (
-    autofmap
+    autofmap, autofmaptype, autofmapdec, autofunctorize
   , Variance(..)
-  , autovariance, autofunctorize
+  , autovariance
   ) where
 
 import Data.Thorn.Type
 import Language.Haskell.TH
+import Data.Maybe
 import Data.List
 import qualified Data.Sequence as S
 import qualified Data.Foldable as F
+import Data.Monoid
 import Control.Applicative
 import Control.Monad.State
-import Data.Monoid
 
 -- |
--- @autofmap t@ generates the @fmap@ of the type @t@.
+-- @autofmap t@ generates a functor function of the type @t@.
 autofmap :: TypeQ -> ExpQ
 autofmap t = do
     (n,tx) <- t >>= type2typex [] [] >>= applySpecial 0
     u <- unique
-    (e,txnmes) <- runStateT (autofmap' u tx) []
-    return $ LamE (map newFuncP [u..u+n-1]) (LetE (fmap (\(_,nm,Just e') -> ValD (VarP nm) (NormalB e') []) txnmes) e)
+    (e,(txnmes,bs)) <- runStateT (autofmap' u tx) ([],S.replicate n False)
+    let txnmes' = filter (\(_,nm,_) -> isJust nm) txnmes
+    return $ LamE (map (\i -> if S.index bs i then newFuncP (i+u) else WildP) [0..n-1]) (LetE (fmap (\(_,Just nm,Just e') -> ValD (VarP nm) (NormalB e') []) txnmes') e)
 
-autofmap',autofmap'' :: Unique -> Typex -> StateT [(Typex,Name,Maybe Exp)] Q Exp
+autofmap',autofmap'' :: Unique -> Typex -> StateT ([(Typex,Maybe Name,Maybe Exp)],S.Seq Bool) Q Exp
 autofmap' u tx = do
-    txnmes <- get
+    (txnmes,bs) <- get
     case find (\(tx',_,_)->tx==tx') txnmes of
-         Just (_,nm,_) -> return (VarE nm)
+         Just (_,Just nm,_) -> return (VarE nm)
+         Just (_,Nothing,_) -> do
+             u2 <- unique
+             let nm = newFmap u2
+             put (map (\(tx',nm',e) -> if tx==tx' then (tx,Just nm,e) else (tx',nm',e)) txnmes, bs)
+             return (VarE nm)
          Nothing -> autofmap'' u tx
 autofmap'' _ (VarTx _) = return $ mkNameE "id"
 autofmap'' _ (BasicTx _) = return $ mkNameE "id"
@@ -38,12 +45,12 @@ autofmap'' _ (FixedTx _) = return $ mkNameE "id"
 autofmap'' _ NotTx = fail "Thorn doesn't work well, sorry."
 autofmap'' _ (FuncTx _) = fail "Thorn doesn't accept such a type with a kind * -> k, sorry."
 autofmap'' u (DataTx nm vmp cxs) = do
-    txnmes <- get
-    put ((tx0, newFmap (length txnmes), Nothing) : txnmes)
+    (txnmes,bs) <- get
+    put ((tx0,Nothing,Nothing) : txnmes, bs)
     u2 <- unique
     e <- LamE [newVarP u2] <$> (CaseE (newVarE u2) <$> (mapM go cxs))
-    txnmes' <- get
-    put $ map (\(tx,nm',e') -> if tx==tx0 then (tx,nm',Just e) else (tx,nm',e')) txnmes'
+    (txnmes',bs') <- get
+    put (map (\(tx,nm',e') -> if tx==tx0 then (tx,nm',Just e) else (tx,nm',e')) txnmes', bs')
     return e
     where go (nm',txs) = do
               (u2,es) <- autofmapmap u txs
@@ -59,9 +66,12 @@ autofmap'' u (ArrowTx txa txb) = do
     u2 <- unique
     return $ LamE [newVarP u2, newVarP (u2+1)] (AppE fb (AppE (newVarE u2) (AppE fa (newVarE (u2+1)))))
 autofmap'' u (ListTx tx) = autofmap' u tx >>= \f -> return $ AppE (mkNameE "map") f
-autofmap'' u (SpecialTx n) = return $ newFuncE (u+n)
+autofmap'' u (SpecialTx n) = do
+    (txnmes,bs) <- get
+    put (txnmes,S.update n True bs)
+    return $ newFuncE (u+n)
 
-autofmapmap :: Unique -> [Typex] -> StateT [(Typex,Name,Maybe Exp)] Q (Unique,[Exp])
+autofmapmap :: Unique -> [Typex] -> StateT ([(Typex,Maybe Name,Maybe Exp)],S.Seq Bool) Q (Unique,[Exp])
 autofmapmap u txs = do
     u2 <- unique
     es <- mapM (\(i,tx) -> autofmap' u tx >>= \e -> return $ AppE e (newVarE i)) (zip [u2..u2+length txs-1] txs)
@@ -142,7 +152,47 @@ autovariance' v dts (ArrowTx txa txb) = autovariance' (neg v) dts txa >> autovar
 autovariance' v dts (ListTx tx) = autovariance' v dts tx
 
 -- |
--- @autofunctorize t@ provides instance delcarations of the type @t@, for the suitable functor classes : Funtor, Contravariant, Bifunctor, or Profunctor.
+-- @autofmaptype t@ provides the type of @$(autofmap t)@.
+autofmaptype :: TypeQ -> TypeQ
+autofmaptype t = do
+    tx <- type2typex [] [] =<< t
+    vs <- autovarianceRaw t
+    let ivs = zip [0..length vs-1] vs
+        a i = mkNameTx ("a"++show i)
+        b i = mkNameTx ("b"++show i)
+        c i = mkNameTx ("c"++show i)
+        a' i = mkName ("a"++show i)
+        b' i = mkName ("b"++show i)
+        c' i = mkName ("c"++show i)
+        gofunc (i,Co) = ArrowTx (a i) (b i)
+        gofunc (i,Contra) = ArrowTx (b i) (a i)
+        gofunc (i,Free) = a i
+        gofunc (i,Fixed) = ArrowTx (a i) (a i)
+        gosrc (i,Co) = a i
+        gosrc (i,Contra) = a i
+        gosrc (i,Free) = b i
+        gosrc (i,Fixed) = a i
+        godst (i,Co) = b i
+        godst (i,Contra) = b i
+        godst (i,Free) = c i
+        godst (i,Fixed) = a i
+        gonm (i,Co) = [a' i,b' i]
+        gonm (i,Contra) = [a' i,b' i]
+        gonm (i,Free) = [a' i,b' i,c' i]
+        gonm (i,Fixed) = [a' i]
+        tvs = map PlainTV $ concatMap gonm ivs
+    funcs <- mapM (typex2type . gofunc) ivs
+    src <- typex2type =<< applistTx tx (map gosrc ivs)
+    dst <- typex2type =<< applistTx tx (map godst ivs)
+    return $ ForallT tvs [] (foldr1 (\ta tb -> applistT ArrowT [ta,tb]) (funcs++[src]++[dst]))
+
+-- |
+-- @autofmapdec s t@ provides a declaration of a functor function for the type @t@ with the name @s@, with a type signature.
+autofmapdec :: String -> TypeQ -> DecsQ
+autofmapdec = gendec1 autofmap autofmaptype
+
+-- |
+-- @autofunctorize t@ provides instance delcarations of the type @t@, for the suitable functor classes : Funtor, Contravariant, Bifunctor, or Profunctor. Multiple classes can be suitable for @t@, when one of the variances of @t@ is @Free@.
 autofunctorize :: TypeQ -> DecsQ
 autofunctorize t = do
     vs <- autovarianceRaw t
