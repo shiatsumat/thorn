@@ -3,12 +3,17 @@
 -- |
 -- The module Data.Thorn.Functor.
 module Data.Thorn.Functor (
+    -- * Functor
+    -- $functor
     autofmap, autofmaptype, autofmapdec, autofunctorize
+    -- ** Variance
   , Variance(..)
   , autovariance
+    -- * Example
+    -- $functorexample
   ) where
 
-import Data.Thorn.Type
+import Data.Thorn.Internal
 import Language.Haskell.TH
 import Data.Maybe
 import Data.List
@@ -17,6 +22,63 @@ import qualified Data.Foldable as F
 import Data.Monoid
 import Control.Applicative
 import Control.Monad.State
+
+{- $functor
+    Thorn generates functors from various kinds of datatypes.
+
+    Quite surprisingly, it still works for any arities, co\/contra\/free\/fixed-variances, partially applied types, type synonyms, and mutual recursions.
+-}
+
+{- $functorexample
+> import Data.Thorn
+> import Data.Functor.Contravariant
+> import Data.Bifunctor
+> import Data.Profunctor
+> 
+> type a :<- b = b -> a
+> varnuf :: [Variance]
+> varnuf = $(autovariance [t|(:<-)|]) -- [Co,Contra]
+> $(autofmapdec "fmapnuf" [t|(:<-)|])
+> 
+> data Cntr a = Cntr (a -> Int)
+> autofunctorize [t|Cntr|] -- instance Contravariant Cntr where ...
+> 
+> vartuple :: [Variance]
+> vartuple = $(autovariance [t|(,,) Int|]) -- [Co,Co]
+> $(autofmapdec "fmaptuple" $[t|(,,) Int|])
+> 
+> data FunFun a b = FunFun ((b -> a) -> b)
+> varfunfun :: [Variance]
+> varfunfun = $(autovariance [t|FunFun|]) -- [Contra,Co]
+> autofunctorize [t|FunFun|] -- instance Profunctor FunFun where ...
+> 
+> data What a b c = What1 c (a -> c) | What2 a
+> varwhat :: [Variance]
+> varwhat = $(autovariance [t|What|]) -- [Fixed,Free,Co]
+> autofunctorize [t|What T0|]
+> -- instance Bifunctor (What a) where ... and
+> -- instance Profunctor (What a) where ...
+> 
+> data List a = Nil | a :* (List a) deriving Show
+> autofunctorize [t|List|] -- instance Functor List where ...
+> fromNormalList :: [a] -> List a
+> fromNormalList [] = Nil
+> fromNormalList (a : as) = a :* fromNormalList as
+> toNormalList :: List a -> [a]
+> toNormalList Nil = []
+> toNormalList (a :* as) = a : toNormalList as
+> list :: [Int]
+> list = toNormalList $ fmap (+10) (fromNormalList [1..5]) -- [11..15]
+> 
+> data Rose a = Rose a (Forest a) deriving Show
+> data Forest a = Forest [Rose a] deriving Show
+> autofunctorize [t|Rose|] -- instance Functor Rose where ...
+> autofunctorize [t|Forest|] -- instance Functor Forest where ...
+> gorose :: Int -> Rose Int
+> gorose n = Rose n (Forest (replicate n (gorose (n-1))))
+> getrose :: Rose Int
+> getrose = fmap (+1) (gorose 2)
+-}
 
 -- |
 -- @autofmap t@ generates a functor function of the type @t@.
@@ -39,9 +101,9 @@ autofmap' u tx = do
              put (map (\(tx',nm',e) -> if tx==tx' then (tx,Just nm,e) else (tx',nm',e)) txnmes, bs)
              return (VarE nm)
          Nothing -> autofmap'' u tx
-autofmap'' _ (VarTx _) = return $ mkNameE "id"
-autofmap'' _ (BasicTx _) = return $ mkNameE "id"
-autofmap'' _ (FixedTx _) = return $ mkNameE "id"
+autofmap'' _ (VarTx _) = return idE
+autofmap'' _ (BasicTx _) = return idE
+autofmap'' _ (FixedTx _) = return idE
 autofmap'' _ NotTx = fail "Thorn doesn't work well, sorry."
 autofmap'' _ (FuncTx _) = fail "Thorn doesn't accept such a type with a kind * -> k, sorry."
 autofmap'' u (DataTx nm vmp cxs) = do

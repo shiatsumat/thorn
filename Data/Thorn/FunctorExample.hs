@@ -52,4 +52,3 @@ gorose :: Int -> Rose Int
 gorose n = Rose n (Forest (replicate n (gorose (n-1))))
 getrose :: Rose Int
 getrose = fmap (+1) (gorose 2)
-

@@ -3,14 +3,16 @@
 -- |
 -- The module Data.Thorn.Zipper.
 module Data.Thorn.Zipper (
-    autozipper
+    Hop(..)
   ) where
 
-import Data.Thorn.Type
+import Data.Thorn.Internal
 import Data.Thorn.Functor
 import Data.Thorn.Fold
 import Language.Haskell.TH
 
-autozipper :: TypeQ -> DecsQ
-autozipper t = fail "oh"
+data Hop =
+    MemberH Name Int
+  | LabelH Name
+  | ListH Int
 
