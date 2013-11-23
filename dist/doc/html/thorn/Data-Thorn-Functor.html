@@ -1,0 +1,109 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>Data.Thorn.Functor</title><link href="ocean.css" rel="stylesheet" type="text/css" title="Ocean" /><script src="haddock-util.js" type="text/javascript"></script><script type="text/javascript">//<![CDATA[
+window.onload = function () {pageLoad();setSynopsis("mini_Data-Thorn-Functor.html");};
+//]]>
+</script></head><body><div id="package-header"><ul class="links" id="page-menu"><li><a href="index.html">Contents</a></li><li><a href="doc-index.html">Index</a></li></ul><p class="caption">thorn-0.1.1: Datatype Manipulation with Template Haskell</p></div><div id="content"><div id="module-header"><table class="info"><tr><th>Safe Haskell</th><td>None</td></tr></table><p class="caption">Data.Thorn.Functor</p></div><div id="table-of-contents"><p class="caption">Contents</p><ul><li><a href="#g:1">Functors
+</a><ul><li><a href="#g:2">Variance
+</a></li></ul></li><li><a href="#g:3">Examples
+</a><ul><li><a href="#g:4">Basic
+</a></li><li><a href="#g:5">Functions
+</a></li><li><a href="#g:6">Partial Application
+</a></li><li><a href="#g:7">Type Synonyms
+</a></li><li><a href="#g:8">Variances
+</a></li><li><a href="#g:9">Recursive Types
+</a></li></ul></li></ul></div><div id="description"><p class="caption">Description</p><div class="doc"><p>The module Data.Thorn.Functor.
+</p></div></div><div id="synopsis"><p id="control.syn" class="caption expander" onclick="toggleSection('syn')">Synopsis</p><ul id="section.syn" class="hide" onclick="toggleSection('syn')"><li class="src short"><a href="#v:autofmap">autofmap</a> :: <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:ExpQ">ExpQ</a></li><li class="src short"><a href="#v:autofmaptype">autofmaptype</a> :: <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a></li><li class="src short"><a href="#v:autofmapdec">autofmapdec</a> :: <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/base-4.6.0.1/Data-String.html#t:String">String</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:DecsQ">DecsQ</a></li><li class="src short"><a href="#v:autofunctorize">autofunctorize</a> :: <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:DecsQ">DecsQ</a></li><li class="src short"><span class="keyword">data</span>  <a href="#t:Variance">Variance</a> <ul class="subs"><li>= <a href="#v:Co">Co</a>  </li><li>| <a href="#v:Contra">Contra</a>  </li><li>| <a href="#v:Free">Free</a>  </li><li>| <a href="#v:Fixed">Fixed</a>  </li></ul></li><li class="src short"><a href="#v:autovariance">autovariance</a> :: <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:ExpQ">ExpQ</a></li></ul></div><div id="interface"><h1 id="g:1">Functors
+</h1><div class="doc"><p>Thorn generates functors from various kinds of datatypes.
+</p><p>Quite surprisingly, it still works for any arities, co/contra/free/fixed-variances, partially applied types, type synonyms, and mutual recursions.
+</p></div><div class="top"><p class="src"><a name="v:autofmap" class="def">autofmap</a> :: <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:ExpQ">ExpQ</a></p><div class="doc"><p><code>autofmap t</code> generates a functor function of the type <code>t</code>.
+</p></div></div><div class="top"><p class="src"><a name="v:autofmaptype" class="def">autofmaptype</a> :: <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a></p><div class="doc"><p><code>autofmaptype t</code> provides the type of <code>$(autofmap t)</code>.
+</p></div></div><div class="top"><p class="src"><a name="v:autofmapdec" class="def">autofmapdec</a> :: <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/base-4.6.0.1/Data-String.html#t:String">String</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:DecsQ">DecsQ</a></p><div class="doc"><p><code>autofmapdec s t</code> provides a declaration of a functor function for the type <code>t</code> with the name <code>s</code>, with a type signature.
+</p></div></div><div class="top"><p class="src"><a name="v:autofunctorize" class="def">autofunctorize</a> :: <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:DecsQ">DecsQ</a></p><div class="doc"><p><code>autofunctorize t</code> provides instance delcarations of the type <code>t</code>, for the suitable functor classes : Funtor, Contravariant, Bifunctor, or Profunctor. Multiple classes can be suitable for <code>t</code>, when one of the variances of <code>t</code> is <code>Free</code>.
+</p></div></div><h2 id="g:2">Variance
+</h2><div class="top"><p class="src"><span class="keyword">data</span>  <a name="t:Variance" class="def">Variance</a>  </p><div class="doc"><p><code>Variance</code> is a variance of a parameter of a functor.
+</p></div><div class="subs constructors"><p class="caption">Constructors</p><table><tr><td class="src"><a name="v:Co" class="def">Co</a></td><td class="doc"><p>Covariance, one of a normal functor.
+</p></td></tr><tr><td class="src"><a name="v:Contra" class="def">Contra</a></td><td class="doc"><p>Contravariance, a dual of covariance.
+</p></td></tr><tr><td class="src"><a name="v:Free" class="def">Free</a></td><td class="doc"><p>Free-variance, or novariance, being supposed to satisfy either covariance or contravariance.
+</p></td></tr><tr><td class="src"><a name="v:Fixed" class="def">Fixed</a></td><td class="doc"><p>Fixed-variance, or invariance, being suppoesed to satisfy both covariance and contravariance.
+</p></td></tr></table></div><div class="subs instances"><p id="control.i:Variance" class="caption collapser" onclick="toggleSection('i:Variance')">Instances</p><div id="section.i:Variance" class="show"><table><tr><td class="src"><a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/base-4.6.0.1/Text-Read.html#t:Read">Read</a> <a href="Data-Thorn-Functor.html#t:Variance">Variance</a></td><td class="doc empty">&nbsp;</td></tr><tr><td class="src"><a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/base-4.6.0.1/Text-Show.html#t:Show">Show</a> <a href="Data-Thorn-Functor.html#t:Variance">Variance</a></td><td class="doc empty">&nbsp;</td></tr><tr><td class="src"><a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/base-4.6.0.1/Data-Monoid.html#t:Monoid">Monoid</a> <a href="Data-Thorn-Functor.html#t:Variance">Variance</a></td><td class="doc"><p><code>v1 <code><a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/base-4.6.0.1/Data-Monoid.html#v:mappend">mappend</a></code> v2</code> means to be supposed to satisfy both <code>v1</code> and <code>v2</code>.
+</p></td></tr></table></div></div></div><div class="top"><p class="src"><a name="v:autovariance" class="def">autovariance</a> :: <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:TypeQ">TypeQ</a> -&gt; <a href="C:\PROGRA~2\HASKEL~1\201320~1.0\lib/../doc/html/libraries/template-haskell-2.8.0.0/Language-Haskell-TH-Lib.html#t:ExpQ">ExpQ</a></p><div class="doc"><p><code>autovariance t</code> provides the variances of the type <code>t</code>.
+</p></div></div><h1 id="g:3">Examples
+</h1><h2 id="g:4">Basic
+</h2><div class="doc"><p>It's a piece of cake.
+</p><pre> testtuple :: (Int,String)
+ testtuple = $(autofmap [t|(,)|]) (+1) ('h':) (100,&quot;ello&quot;) -- (101,&quot;hello&quot;)
+ 
+ testeither :: Either Int String
+ testeither = $(autofmap [t|Either|]) (+1) ('a':) (Left 100) -- Left 101
+ 
+ testfunction :: String
+ testfunction = $(autofmap [t|(-&gt;)|]) ('h':) (++&quot;!&quot;) (++&quot;, world&quot;) &quot;ello&quot; -- &quot;hello, world!&quot;
+ 
+ testlist :: [Int]
+ testlist = $(autofmap [t|[]|]) (+10) [1..5] -- [11..15]
+</pre></div><h2 id="g:5">Functions
+</h2><div class="doc"><p>You can nest functions.
+</p><pre> data FunFun a b = FunFun ((b -&gt; a) -&gt; b)
+ 
+ varfunfun :: [Variance]
+ varfunfun = $(autovariance [t|FunFun|]) -- [Contra,Co]
+ 
+ autofunctorize [t|FunFun|]
+ -- instance Profunctor FunFun where
+ --     dimap = ...
+</pre></div><h2 id="g:6">Partial Application
+</h2><div class="doc"><p>It works for partially applied types.
+</p><pre> testpartial :: (Int,Int,Int)
+ testpartial = $(autofmap $[t|(,,) Int|]) (+10) (+20) (1,1,1) -- (1,11,21)
+</pre><p>You can use type variants <code><code><a href="Data-Thorn-Basic.html#t:T0">T0</a></code>, <code><a href="Data-Thorn-Basic.html#t:T1">T1</a></code>, .., <code><a href="Data-Thorn-Basic.html#t:T9">T9</a></code></code> to represent any type.
+</p><pre> testpartial' :: (String,Int,Int)
+ testpartial' = $(autofmap $[t|(,,) T0|]) (+10) (+20) (&quot;hello&quot;,1,1) -- (&quot;hello&quot;,11,21)
+</pre></div><h2 id="g:7">Type Synonyms
+</h2><div class="doc"><p>Interestingly, it works for type synonym.
+</p><pre> type a :&lt;- b = b -&gt; a
+ varnuf :: [Variance]
+ varnuf = $(autovariance [t|(:&lt;-)|]) -- [Co,Contra]
+ $(autofmapdec &quot;fmapnuf&quot; [t|(:&lt;-)|])
+</pre></div><h2 id="g:8">Variances
+</h2><div class="doc"><p>It works for fixed-variance and free-variance. See how <code>autofunctorize</code> works for free-variance.
+</p><pre> data What a b c = What1 c (a -&gt; c) | What2 a
+ 
+ varwhat :: [Variance]
+ varwhat = $(autovariance [t|What|]) -- [Fixed,Free,Co]
+ 
+ autofunctorize [t|What T0|]
+ -- instance Bifunctor (What a) where
+ --     bimap = ...
+ -- instance Profunctor (What a) where
+ --     dimap = ...
+</pre></div><h2 id="g:9">Recursive Types
+</h2><div class="doc"><p>It works for recursive types.
+</p><pre> data List a = Nil | a :* (List a) deriving Show
+ 
+ autofunctorize [t|List|]
+ -- instance Functor List where
+ --     fmap = ...
+ 
+ fromNormalList :: [a] -&gt; List a
+ fromNormalList [] = Nil
+ fromNormalList (a : as) = a :* fromNormalList as
+ toNormalList :: List a -&gt; [a]
+ toNormalList Nil = []
+ toNormalList (a :* as) = a : toNormalList as
+ 
+ testlist :: [Int]
+ testlist = toNormalList $ fmap (+10) (fromNormalList [1..5]) -- [11..15]
+</pre><p>It also works for mutually recursive datatypes.
+</p><pre> data Rose a = Rose a (Forest a) deriving Show
+ data Forest a = Forest [Rose a] deriving Show
+ 
+ autofunctorize [t|Rose|]
+ -- instance Functor Rose where
+ --     fmap = ...
+ 
+ gorose :: Int -&gt; Rose Int
+ gorose 0 = Rose 0 (Forest [])
+ gorose n = Rose n (Forest (replicate 2 (gorose (n-1))))
+ testrose :: Rose Int
+ testrose = fmap (+10) (gorose 2)
+ -- Rose 12 (Forest [Rose 11 (Forest [Rose 10 (Forest []),Rose 10 (Forest [])]),Rose 11 (Forest [Rose 10 (Forest []),Rose 10 (Forest [])])])
+</pre></div></div></div><div id="footer"><p>Produced by <a href="http://www.haskell.org/haddock/">Haddock</a> version 2.13.2</p></div></body></html>

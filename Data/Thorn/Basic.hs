@@ -12,7 +12,7 @@ module Data.Thorn.Basic (
 import Data.Thorn.Internal
 
 {- $typevariants
-    These types are used for representing type variants.
+    These types @'T0', .. 'T9'@ are used for representing type variants.
 
 > testtypevariant :: (String,Int,Int)
 > testtypevariant = $(autofmap $[t|(,,) T0|]) (+10) (+20) ("hello",1,1) -- ("hello",11,21)

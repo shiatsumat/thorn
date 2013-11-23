@@ -88,7 +88,7 @@ import Control.Monad.State
 > testpartial :: (Int,Int,Int)
 > testpartial = $(autofmap $[t|(,,) Int|]) (+10) (+20) (1,1,1) -- (1,11,21)
 
-    You can use type variants @'T0', 'T1', ..., 'T9'@ to represent any type.
+    You can use type variants @'T0', 'T1', .., 'T9'@ to represent any type.
 
 > testpartial' :: (String,Int,Int)
 > testpartial' = $(autofmap $[t|(,,) T0|]) (+10) (+20) ("hello",1,1) -- ("hello",11,21)
