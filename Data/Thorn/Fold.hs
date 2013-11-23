@@ -9,7 +9,7 @@ module Data.Thorn.Fold (
     -- ** Mutual Recursion
   , unfixdataMutual, autofoldMutual, autofoldtypeMutual, autofolddecMutual, autounfoldMutual, autounfoldtypeMutual, autounfolddecMutual
     -- ** Helper Function
-  , modifynameunfix
+  , modifynameUf
     -- ** Primitive Functions
   , autoin, autoout, autohylo
   , autoinMutual, autooutMutual, autohyloMutual
@@ -30,84 +30,116 @@ import Control.Applicative
 
 {- $fold
     Thorn generates folds and unfolds from various kinds of recursive datatypes, including mutually recursive ones.
-
-
 -}
 
 {- $basic
 
-> oh
+It's a piece of cake.
+
+Note tht @foldlist@ is analogous with 'foldr' and @unfoldlist@ with 'unfoldr'.
+
+> data List a = Nil | a :* (List a) deriving Show
+> 
+> unfixdata [t|List|] "UfList" modifynameUf [''Show]
+> -- data UfList a self = UfNil | a :&* self deriving Show
+> 
+> autofolddec "foldlist" [t|UfList|] [t|List|]
+> autounfolddec "unfoldlist" [t|UfList|] [t|List|]
+> 
+> fib :: List Int
+> fib = unfoldlist go (0,1)
+>       -- 1 :* (1 :* (2 :* (3 :* (5 :* (8 :* (13 :* Nil))))))
+>     where go :: (Int,Int) -> UfList Int (Int,Int)
+>           go (a,b)
+>             | b > 20 = UfNil
+>             | otherwise = b :&* (b,a+b)
+> 
+> fibsum :: Int
+> fibsum = foldlist add fib
+>          -- 33
+>     where add :: UfList Int Int -> Int
+>           add UfNil = 0
+>           add (m :&* n) = m+n
+> 
+> normalfib :: [Int]
+> normalfib = foldlist go fib
+>             -- [1,1,2,3,5,8,13]
+>     where go :: UfList a [a] -> [a]
+>           go UfNil = []
+>           go (a :&* as) = a:as
 
 -}
 
 {- $mutual
 
-> oh
+It also works for mutual recursion.
 
--}
+It's just an extension of simple recursion. Take it easy.
 
-{-
-> import Data.Thorn
-> import Data.Functor.Contravariant
-> import Data.Bifunctor
-> import Data.Profunctor
+> data Rose x = x :-< (Forest x) deriving Show
+> data Forest x = F [Rose x] deriving Show
 > 
-> type a :<- b = b -> a
-> varnuf :: [Variance]
-> varnuf = $(autovariance [t|(:<-)|]) -- [Co,Contra]
-> $(autofmapdec "fmapnuf" [t|(:<-)|])
+> unfixdataMutual [([t|Rose|],"UfRose",modifynameUf,[''Show]), ([t|Forest|],"UfForest",modifynameUf,[''Show])]
+> -- data UfRose x rose forest = x :&-< forest deriving Show
+> -- data UfForest x rose forest = UfF [rose] deriving Show
 > 
-> data Cntr a = Cntr (a -> Int)
-> autofunctorize [t|Cntr|] -- instance Contravariant Cntr where ...
+> autofolddecMutual "foldrose" [([t|UfRose|],[t|Rose|]),([t|UfForest|],[t|Forest|])] 0
+> -- foldrose :: (UfRose x a b -> a) -> (UfForest x a b -> b) -> Rose x -> a
+> -- foldrose = ...
+> autounfolddecMutual "unfoldrose" [([t|UfRose|],[t|Rose|]),([t|UfForest|],[t|Forest|])] 0
+> -- unfoldrose :: (a -> UfRose x a b) -> (b -> UfForest x a b) -> a -> Rose x
+> -- unfoldrose = ...
 > 
-> vartuple :: [Variance]
-> vartuple = $(autovariance [t|(,,) Int|]) -- [Co,Co]
-> $(autofmapdec "fmaptuple" $[t|(,,) Int|])
+> rose :: Rose Int
+> rose = unfoldrose gorose goforest 0
+>        -- 0 :-< F [1 :-< F [3 :-< F [],4 :-< F []],2 :-< F [5 :-< F [],6 :-< F []]]
+>     where gorose :: Int -> UfRose Int Int Int
+>           gorose n
+>             | n > 2 = n :&-< (-1)
+>             | otherwise = n :&-< n
+>           goforest :: Int -> UfForest Int Int Int
+>           goforest (-1) = UfF []
+>           goforest n = UfF [n*2+1,n*2+2]
 > 
-> data FunFun a b = FunFun ((b -> a) -> b)
-> varfunfun :: [Variance]
-> varfunfun = $(autovariance [t|FunFun|]) -- [Contra,Co]
-> autofunctorize [t|FunFun|] -- instance Profunctor FunFun where ...
+> showrose :: Show x => Rose x -> String
+> showrose = unlines . foldrose gorose goforest
+>     where gorose :: Show x => UfRose x [String] [String] -> [String]
+>           gorose (x :&-< ls) = [show x] ++ ls
+>           goforest :: UfForest x [String] [String] -> [String]
+>           goforest (UfF []) = []
+>           goforest (UfF lss) = concatMap hang (init lss) ++ hang' (last lss)
+>           hang ls = ["|"] ++ ["+--" ++ head ls] ++ map ("|  "++) (tail ls)
+>           hang' ls = ["|"] ++ ["+--" ++ head ls] ++ map ("   "++) (tail ls)
 > 
-> data What a b c = What1 c (a -> c) | What2 a
-> varwhat :: [Variance]
-> varwhat = $(autovariance [t|What|]) -- [Fixed,Free,Co]
-> autofunctorize [t|What T0|]
-> -- instance Bifunctor (What a) where ... and
-> -- instance Profunctor (What a) where ...
-> 
-> data List a = Nil | a :* (List a) deriving Show
-> autofunctorize [t|List|] -- instance Functor List where ...
-> fromNormalList :: [a] -> List a
-> fromNormalList [] = Nil
-> fromNormalList (a : as) = a :* fromNormalList as
-> toNormalList :: List a -> [a]
-> toNormalList Nil = []
-> toNormalList (a :* as) = a : toNormalList as
-> list :: [Int]
-> list = toNormalList $ fmap (+10) (fromNormalList [1..5]) -- [11..15]
-> 
-> data Rose a = Rose a (Forest a) deriving Show
-> data Forest a = Forest [Rose a] deriving Show
-> autofunctorize [t|Rose|] -- instance Functor Rose where ...
-> autofunctorize [t|Forest|] -- instance Functor Forest where ...
-> gorose :: Int -> Rose Int
-> gorose n = Rose n (Forest (replicate n (gorose (n-1))))
-> getrose :: Rose Int
-> getrose = fmap (+1) (gorose 2)
+> shownrose :: String
+> shownrose = showrose rose
+> -- 0
+> -- |
+> -- +--1
+> -- |  |
+> -- |  +--3
+> -- |  |
+> -- |  +--4
+> -- |
+> -- +--2
+> --    |
+> --    +--5
+> --    |
+> --    +--6
+
 -}
 
 -- |
 -- Use this function to designate how to convert the name of data constructors for 'unfixdata'.
 -- 
--- > modifynameunfix "Hello" == "UfHello"
--- > modifynameunfix ":***" == ":&***"
+-- > modifynameUf "Hello" == "UfHello"
+-- > modifynameUf ":***" == ":&***"
 -- 
 -- Note that
 -- 
--- @'modifynameunfix' == 'modifyname' (\"Uf\",\"\") (\"&\",\"\")@
-modifynameunfix :: String -> String
-modifynameunfix = modifyname ("Uf","") ("&","")
+-- @'modifynameUf' == 'modifyname' (\"Uf\",\"\") (\"&\",\"\")@
+modifynameUf :: String -> String
+modifynameUf = modifyname ("Uf","") ("&","")
 
 -- |
 -- @unfixdata t n f ds@ provides a declaration of a nonrecursive datatype whose fixpoint is the recursive type @t@, with a deriving declaration with names @ds@.
@@ -137,11 +169,11 @@ autohylo ::
 autohylo u = autohyloMutual [u] 0
 
 -- |
--- @autofold u t@ provides a folding function for the recursive type @t@.
+-- @autofold u t@ provides a fold for the recursive type @t@.
 autofold ::
     TypeQ -- ^ @u@, nonrecursive datatype
  -> TypeQ -- ^ @t@, fixpoint of @u@
- -> ExpQ -- ^ folding function with a type @(u x0 .. xn a -> a) -> (t x0 .. xn -> a)@
+ -> ExpQ -- ^ fold with a type @(u x0 .. xn a -> a) -> (t x0 .. xn -> a)@
 autofold u t = autofoldMutual [(u,t)] 0
 
 -- |
@@ -150,16 +182,16 @@ autofoldtype :: TypeQ -> TypeQ -> TypeQ
 autofoldtype u t = autofoldtypeMutual [(u,t)] 0
 
 -- |
--- @autofolddec s u t@ provides a declaration of a folding function for the recursive type @t@ with the name @s@, with a type signature.
+-- @autofolddec s u t@ provides a declaration of a fold for the recursive type @t@ with the name @s@, with a type signature.
 autofolddec :: String -> TypeQ -> TypeQ -> DecsQ
 autofolddec = gendec2 autofold autofoldtype
 
 -- |
--- @autounfold t@ provides an unfolding function for the recursive type @t@.
+-- @autounfold u t@ provides an unfold for the recursive type @t@.
 autounfold ::
     TypeQ -- ^ @u@, nonrecursive datatype
  -> TypeQ -- ^ @t@, fixpoint of @u@
- -> ExpQ -- ^ unfolding function with a type @(a -> u x0 .. xn a) -> (a -> t x0 .. xn)@
+ -> ExpQ -- ^ unfold with a type @(a -> u x0 .. xn a) -> (a -> t x0 .. xn)@
 autounfold u t = do
     e <- autounfoldMutual [(u,t)] 0
     return e
@@ -170,7 +202,7 @@ autounfoldtype :: TypeQ -> TypeQ -> TypeQ
 autounfoldtype u t = autounfoldtypeMutual [(u,t)] 0
 
 -- |
--- @autounfolddec s u t@ provides a declaration of an unfolding function for the recursive type @t@ with the name @s@, with a type signature.
+-- @autounfolddec s u t@ provides a declaration of an unfold for the recursive type @t@ with the name @s@, with a type signature.
 autounfolddec :: String -> TypeQ -> TypeQ -> DecsQ
 autounfolddec = gendec2 autounfold autounfoldtype
 
@@ -201,13 +233,12 @@ unfixdataMutual tsfdss = do
         modifytx (ListTx tx) = ListTx (modifytx tx)
         modifytx tx = tx
         modifycx (nm,txs) = (nm,map modifytx txs)
-        go (f,(nm,txs)) = do
+        go f (nm,txs) = do
               ts' <- map ((,) NotStrict) <$> mapM (typex2type . modifytx) txs
-              return $ NormalC newnm ts'
-            where newnm = mkName (f (nameBase nm))
+              return $ NormalC (fixname f nm) ts'
         ho (nm,s,cns,ds) = DataD [] newnm (map var [0..n-1] ++ map self [0..l-1]) cns ds
-            where newnm = if s=="" then mkName (modifyname ("Uf","") ("&","") (nameBase nm)) else mkName s
-    cnss <- mapM (mapM go . zip fs) cxss
+            where newnm = if s=="" then fixname (modifyname ("Uf","") ("&","")) nm else mkName s
+    cnss <- mapM (\(cxs,f) -> mapM (go f) cxs) (zip cxss fs)
     return $ map ho (zip4 nms ss cnss dss)
     where var i = PlainTV $ mkName ("t" ++ show i)
           self i = PlainTV $ mkName ("self" ++ show i)
@@ -215,7 +246,7 @@ unfixdataMutual tsfdss = do
 -- |
 -- Mutually recursive version of 'autoin'.
 autoinMutual ::
-    [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is an nonrecursive datatype and @ti@ is a fixpoint of @ui@
+    [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is a nonrecursive datatype and @ti@ is a fixpoint of @ui@
  -> Int -- ^ @k@, index
  -> ExpQ -- ^ function with a type @uk x0 .. xm t0 .. tn -> tk x0 .. xm@
 autoinMutual uts k = do
@@ -234,7 +265,7 @@ autoinMutual uts k = do
 -- |
 -- Mutually recursive version of 'autoout'.
 autooutMutual ::
-    [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is an nonrecursive datatype and @ti@ is a fixpoint of @ui@
+    [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is a nonrecursive datatype and @ti@ is a fixpoint of @ui@
  -> Int -- ^ @k@, index
  -> ExpQ -- ^ function with a type @tk x0 .. xm -> uk x0 .. xm t0 .. tn@
 autooutMutual uts k = do
@@ -253,9 +284,9 @@ autooutMutual uts k = do
 -- |
 -- Mutually recursive version of 'autohylo'.
 autohyloMutual ::
-    [TypeQ] -- ^ @[u0, .., un]@; @ui@ is an nonrecursive datatype
+    [TypeQ] -- ^ @[u0, .., un]@; @ui@ is a nonrecursive datatype
  -> Int -- ^ @k@, index
- -> ExpQ -- ^ function with a type @(a0 -> u0 x0 .. xm a0 .. an) -> .. -> (an -> un x0 .. xm a0 .. an) -> (u0 x0 .. xm b0 .. bn -> b0) -> (un x0 .. xm b0 .. bn -> bn) -> (ak -> bk)@
+ -> ExpQ -- ^ function with a type @(a0 -> u0 x0 .. xm a0 .. an) -> .. -> (an -> un x0 .. xm a0 .. an) -> (u0 x0 .. xm b0 .. bn -> b0) -> .. -> (un x0 .. xm b0 .. bn -> bn) -> (ak -> bk)@
 autohyloMutual us k = do
     ms <- mapM (\u -> u >>= type2typex [] [] >>= applyFixed 0 >>= \(m,DataTx _ _ _) -> return m) us
     fms <- mapM autofmap us
@@ -279,11 +310,11 @@ autohyloMutual us k = do
     -}
 
 -- |
--- @autofoldMutual uts k@ provides a folding function for the mutually recursive type @tk@.
+-- @autofoldMutual uts k@ provides a fold for the mutually recursive type @tk@.
 autofoldMutual ::
-    [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is an nonrecursive datatype and @ti@ is a fixpoint of @ui@
+    [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is a nonrecursive datatype and @ti@ is a fixpoint of @ui@
  -> Int -- ^ @k@, index
- -> ExpQ -- ^ folding function with a type @(u0 x0 .. xm a0 .. an -> a0) -> .. -> (un x0 .. xm a0 .. an -> an) -> (tk x0 .. xm -> ak)@
+ -> ExpQ -- ^ fold with a type @(u0 x0 .. xm a0 .. an -> a0) -> .. -> (un x0 .. xm a0 .. an -> an) -> (tk x0 .. xm -> ak)@
 autofoldMutual uts k = do
     os <- mapM (autooutMutual uts) [0..n-1]
     h <- autohyloMutual (map fst uts) k
@@ -310,16 +341,16 @@ autofoldtypeMutual uts k = do
         foldr1 (\t1 t2 -> AppT (AppT ArrowT t1) t2) (fs ++ [t, VarT $ a k]))
 
 -- |
--- @autofolddecMutual s uts k@ provides a declaration of a folding function for the mutually recursive type @tk@ with the name @s@, with a type signature.
+-- @autofolddecMutual s uts k@ provides a declaration of a fold for the mutually recursive type @tk@ with the name @s@, with a type signature.
 autofolddecMutual :: String -> [(TypeQ,TypeQ)] -> Int -> DecsQ
 autofolddecMutual = gendec2 autofoldMutual autofoldtypeMutual
 
 -- |
--- @autounfoldMutual uts k@ provides an unfolding function for the mutually recursive type @tk@.
+-- @autounfoldMutual uts k@ provides an unfold for the mutually recursive type @tk@.
 autounfoldMutual ::
-    [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is an nonrecursive datatype and @ti@ is a fixpoint of @ui@
+    [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is a nonrecursive datatype and @ti@ is a fixpoint of @ui@
  -> Int -- ^ @k@, index
- -> ExpQ -- ^ unfolding function with a type @(a0 -> u0 x0 .. xm a0 .. an) -> .. -> (an -> un x0 .. xm a0 .. an) -> (ak -> tk x0 .. xm)@
+ -> ExpQ -- ^ unfold with a type @(a0 -> u0 x0 .. xm a0 .. an) -> .. -> (an -> un x0 .. xm a0 .. an) -> (ak -> tk x0 .. xm)@
 autounfoldMutual uts k = do
     is <- mapM (autoinMutual uts) [0..n-1]
     h <- autohyloMutual (map fst uts) k
@@ -347,7 +378,7 @@ autounfoldtypeMutual uts k = do
         foldr1 (\t1 t2 -> AppT (AppT ArrowT t1) t2) (fs ++ [VarT $ a k, t]))
 
 -- |
--- @autofolddecMutual s uts k@ provides a declaration of an unfolding function for the mutually recursive type @tk@ with the name @s@, with a type signature.
+-- @autounfolddecMutual s uts k@ provides a declaration of an unfold for the mutually recursive type @tk@ with the name @s@, with a type signature.
 autounfolddecMutual :: String -> [(TypeQ,TypeQ)] -> Int -> DecsQ
 autounfolddecMutual = gendec2 autounfoldMutual autounfoldtypeMutual
 

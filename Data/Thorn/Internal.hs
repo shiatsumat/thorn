@@ -16,7 +16,7 @@ module Data.Thorn.Internal (
   , T0, T1, T2, T3, T4, T5, T6, T7, T8, T9
   , applySpecial, applyFixed, applyFixed'
   , gendec1, gendec2
-  , modifyname
+  , modifyname, fixname
   ) where
 
 import Language.Haskell.TH
@@ -274,12 +274,19 @@ gendec2 f g s a b = do
     return [SigD (mkName s) t, ValD (mkNameP s) (NormalB e) []]
 
 -- |
--- @modifyname (pre,suf) (preinfix,sufinfix) s@
+-- > modifyname ("Prefix","Suffix") ("***","+++") "Hello" == "PrefixHelloSuffix"
+-- > modifyname ("Prefix","Suffix") ("***","+++") ":%%%" == ":***%%%+++"
+-- > modifyname ("prefix","suffix") ("***","+++") "hello" == "prefixhellosuffix"
+-- > modifyname ("prefix","suffix") ("***","+++") "%%%" == "***%%%+++"
 modifyname :: (String,String) -> (String,String) -> String -> String
 modifyname (pre,suf) (preinfix,sufinfix) s
     | isAlpha (head s) = pre ++ s ++ suf
-    | take 2 s == "(:" = ":" ++ preinfix ++ init (drop 2 s) ++ sufinfix
     | head s == ':' = ":" ++ preinfix ++ tail s ++ sufinfix
-    | head s == '(' = preinfix ++ init (tail s) ++ sufinfix
     | otherwise = preinfix ++ s ++ sufinfix
+
+fixname :: (String -> String) -> Name -> Name
+fixname f nm
+    | head s == '(' = mkName (f (init (tail s)))
+    | otherwise = mkName (f s)
+    where s = nameBase nm
 

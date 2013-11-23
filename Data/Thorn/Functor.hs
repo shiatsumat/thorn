@@ -88,7 +88,7 @@ import Control.Monad.State
 > testpartial :: (Int,Int,Int)
 > testpartial = $(autofmap $[t|(,,) Int|]) (+10) (+20) (1,1,1) -- (1,11,21)
 
-    You can use type variants @'T0', 'T1', .., 'T9'@ to represent any type.
+    You can use type variants @'T0', 'T1', ..., 'T9'@ to represent any type.
 
 > testpartial' :: (String,Int,Int)
 > testpartial' = $(autofmap $[t|(,,) T0|]) (+10) (+20) ("hello",1,1) -- ("hello",11,21)
@@ -97,7 +97,7 @@ import Control.Monad.State
 
 {- $synonym
 
-Interestingly, it works for type synonym.
+Interestingly, it works for type synonyms.
 
 > type a :<- b = b -> a
 > varnuf :: [Variance]
@@ -108,7 +108,7 @@ Interestingly, it works for type synonym.
 
 {- $variance
 
-It works for fixed-variance and free-variance. See how @autofunctorize@ works for free-variance.
+It works for free-variance and fixed-variance. See how @autofunctorize@ works for free-variance.
 
 > data What a b c = What1 c (a -> c) | What2 a
 > 
@@ -125,7 +125,7 @@ It works for fixed-variance and free-variance. See how @autofunctorize@ works fo
 
 {- $recursive
 
-It works for recursive types.
+It works for recursive datatypes.
 
 > data List a = Nil | a :* (List a) deriving Show
 > 
@@ -162,7 +162,7 @@ It also works for mutually recursive datatypes.
 -}
 
 -- |
--- @autofmap t@ generates a functor function of the type @t@.
+-- @autofmap t@ generates an fmap of the type @t@.
 autofmap :: TypeQ -> ExpQ
 autofmap t = do
     (n,tx) <- t >>= type2typex [] [] >>= applySpecial 0
@@ -225,11 +225,11 @@ autofmapmap u txs = do
 data Variance =
     -- | Covariance, one of a normal functor.
     Co
-    -- | Contravariance, a dual of covariance.
+    -- | Contravariance, the dual of covariance.
   | Contra
-    -- | Free-variance, or novariance, being supposed to satisfy either covariance or contravariance.
+    -- | Free-variance, or invariance, being supposed to satisfy either covariance or contravariance.
   | Free
-    -- | Fixed-variance, or invariance, being suppoesed to satisfy both covariance and contravariance.
+    -- | Fixed-variance, or nonvariance, being supposed to satisfy both covariance and contravariance.
   | Fixed deriving (Show, Read)
 
 -- | @v1 `mappend` v2@ means to be supposed to satisfy both @v1@ and @v2@.
@@ -295,7 +295,7 @@ autovariance' v dts (ArrowTx txa txb) = autovariance' (neg v) dts txa >> autovar
 autovariance' v dts (ListTx tx) = autovariance' v dts tx
 
 -- |
--- @autofmaptype t@ provides the type of @$(autofmap t)@.
+-- @autofmaptype t@ provides the type of @$('autofmap' t)@.
 autofmaptype :: TypeQ -> TypeQ
 autofmaptype t = do
     tx <- type2typex [] [] =<< t
@@ -330,12 +330,12 @@ autofmaptype t = do
     return $ ForallT tvs [] (foldr1 (\ta tb -> applistT ArrowT [ta,tb]) (funcs++[src]++[dst]))
 
 -- |
--- @autofmapdec s t@ provides a declaration of a functor function for the type @t@ with the name @s@, with a type signature.
+-- @autofmapdec s t@ provides a declaration of an fmap for the type @t@ with the name @s@, with a type signature.
 autofmapdec :: String -> TypeQ -> DecsQ
 autofmapdec = gendec1 autofmap autofmaptype
 
 -- |
--- @autofunctorize t@ provides instance delcarations of the type @t@, for the suitable functor classes : Funtor, Contravariant, Bifunctor, or Profunctor. Multiple classes can be suitable for @t@, when one of the variances of @t@ is @Free@.
+-- @autofunctorize t@ provides instance delcarations of the type @t@, for the suitable functor classes : 'Functor', 'Data.Functor.Contravariant.Contravariant', 'Data.Bifunctor.Bifunctor', or 'Data.Profunctor.Profunctor'. Multiple classes can be suitable for @t@, when one of the variances of @t@ is 'Free'.
 autofunctorize :: TypeQ -> DecsQ
 autofunctorize t = do
     vs <- autovarianceRaw t

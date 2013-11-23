@@ -3,13 +3,15 @@ synopsis: Datatype Manipulation with Template Haskell
 description:
     Thorn generates
     .
-    * functors from various kinds of datatypes, regardless of its arity or variances.
+    * functors from various kinds of datatypes, regardless of arity or variances.
     .
     * folds and unfolds from various kinds of recursive datatypes, including mutually recursive ones.
     .
     A single function of Thorn will give you a lot. Just try it.
+    .
+    The haddock is here. <http://kinokkory.github.io/Thorn/>
 category: Data, Generics
-version: 0.1.1
+version: 0.2
 stability: experimental
 license: BSD3
 license-file: LICENSE
