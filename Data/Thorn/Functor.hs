@@ -3,15 +3,34 @@
 -- |
 -- The module Data.Thorn.Functor.
 module Data.Thorn.Functor (
-    -- * Functor
+    -- * Functors
     -- $functor
     autofmap, autofmaptype, autofmapdec, autofunctorize
+    
     -- ** Variance
   , Variance(..)
   , autovariance
-    -- * Example
-    -- $functorexample
-  ) where
+    
+    -- * Examples
+     
+    -- ** Basic
+    -- $basic
+    
+    -- ** Functions
+    -- $function
+    
+    -- ** Partial Application
+    -- $partial
+    
+    -- ** Type Synonyms
+    -- $synonym
+    
+    -- ** Variances
+    -- $variance
+    
+    -- ** Recursive Types
+    -- $recursive
+    ) where
 
 import Data.Thorn.Internal
 import Language.Haskell.TH
@@ -29,55 +48,117 @@ import Control.Monad.State
     Quite surprisingly, it still works for any arities, co\/contra\/free\/fixed-variances, partially applied types, type synonyms, and mutual recursions.
 -}
 
-{- $functorexample
-> import Data.Thorn
-> import Data.Functor.Contravariant
-> import Data.Bifunctor
-> import Data.Profunctor
+{- $basic
+
+    It's a piece of cake.
+
+> testtuple :: (Int,String)
+> testtuple = $(autofmap [t|(,)|]) (+1) ('h':) (100,"ello") -- (101,"hello")
 > 
+> testeither :: Either Int String
+> testeither = $(autofmap [t|Either|]) (+1) ('a':) (Left 100) -- Left 101
+> 
+> testfunction :: String
+> testfunction = $(autofmap [t|(->)|]) ('h':) (++"!") (++", world") "ello" -- "hello, world!"
+> 
+> testlist :: [Int]
+> testlist = $(autofmap [t|[]|]) (+10) [1..5] -- [11..15]
+
+-}
+
+{- $function
+
+    You can nest functions.
+
+> data FunFun a b = FunFun ((b -> a) -> b)
+> 
+> varfunfun :: [Variance]
+> varfunfun = $(autovariance [t|FunFun|]) -- [Contra,Co]
+> 
+> autofunctorize [t|FunFun|]
+> -- instance Profunctor FunFun where
+> --     dimap = ...
+
+-}
+
+{- $partial
+
+    It works for partially applied types.
+
+> testpartial :: (Int,Int,Int)
+> testpartial = $(autofmap $[t|(,,) Int|]) (+10) (+20) (1,1,1) -- (1,11,21)
+
+    You can use type variants @'T0', 'T1', ..., 'T9'@ to represent any type.
+
+> testpartial' :: (String,Int,Int)
+> testpartial' = $(autofmap $[t|(,,) T0|]) (+10) (+20) ("hello",1,1) -- ("hello",11,21)
+
+-}
+
+{- $synonym
+
+Interestingly, it works for type synonym.
+
 > type a :<- b = b -> a
 > varnuf :: [Variance]
 > varnuf = $(autovariance [t|(:<-)|]) -- [Co,Contra]
 > $(autofmapdec "fmapnuf" [t|(:<-)|])
-> 
-> data Cntr a = Cntr (a -> Int)
-> autofunctorize [t|Cntr|] -- instance Contravariant Cntr where ...
-> 
-> vartuple :: [Variance]
-> vartuple = $(autovariance [t|(,,) Int|]) -- [Co,Co]
-> $(autofmapdec "fmaptuple" $[t|(,,) Int|])
-> 
-> data FunFun a b = FunFun ((b -> a) -> b)
-> varfunfun :: [Variance]
-> varfunfun = $(autovariance [t|FunFun|]) -- [Contra,Co]
-> autofunctorize [t|FunFun|] -- instance Profunctor FunFun where ...
-> 
+
+-}
+
+{- $variance
+
+It works for fixed-variance and free-variance. See how @autofunctorize@ works for free-variance.
+
 > data What a b c = What1 c (a -> c) | What2 a
+> 
 > varwhat :: [Variance]
 > varwhat = $(autovariance [t|What|]) -- [Fixed,Free,Co]
-> autofunctorize [t|What T0|]
-> -- instance Bifunctor (What a) where ... and
-> -- instance Profunctor (What a) where ...
 > 
+> autofunctorize [t|What T0|]
+> -- instance Bifunctor (What a) where
+> --     bimap = ...
+> -- instance Profunctor (What a) where
+> --     dimap = ...
+
+-}
+
+{- $recursive
+
+It works for recursive types.
+
 > data List a = Nil | a :* (List a) deriving Show
-> autofunctorize [t|List|] -- instance Functor List where ...
+> 
+> autofunctorize [t|List|]
+> -- instance Functor List where
+> --     fmap = ...
+> 
 > fromNormalList :: [a] -> List a
 > fromNormalList [] = Nil
 > fromNormalList (a : as) = a :* fromNormalList as
 > toNormalList :: List a -> [a]
 > toNormalList Nil = []
 > toNormalList (a :* as) = a : toNormalList as
-> list :: [Int]
-> list = toNormalList $ fmap (+10) (fromNormalList [1..5]) -- [11..15]
 > 
+> testlist :: [Int]
+> testlist = toNormalList $ fmap (+10) (fromNormalList [1..5]) -- [11..15]
+
+It also works for mutually recursive datatypes.
+
 > data Rose a = Rose a (Forest a) deriving Show
 > data Forest a = Forest [Rose a] deriving Show
-> autofunctorize [t|Rose|] -- instance Functor Rose where ...
-> autofunctorize [t|Forest|] -- instance Functor Forest where ...
+> 
+> autofunctorize [t|Rose|]
+> -- instance Functor Rose where
+> --     fmap = ...
+> 
 > gorose :: Int -> Rose Int
-> gorose n = Rose n (Forest (replicate n (gorose (n-1))))
-> getrose :: Rose Int
-> getrose = fmap (+1) (gorose 2)
+> gorose 0 = Rose 0 (Forest [])
+> gorose n = Rose n (Forest (replicate 2 (gorose (n-1))))
+> testrose :: Rose Int
+> testrose = fmap (+10) (gorose 2)
+> -- Rose 12 (Forest [Rose 11 (Forest [Rose 10 (Forest []),Rose 10 (Forest [])]),Rose 11 (Forest [Rose 10 (Forest []),Rose 10 (Forest [])])])
+
 -}
 
 -- |

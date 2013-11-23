@@ -5,9 +5,9 @@
 module Data.Thorn.Fold (
     -- * Folding and Unfolding
     -- $fold
-    unfixdata, unfixdataEx, autofold, autofoldtype, autofolddec, autounfold, autounfoldtype, autounfolddec
+    unfixdata, autofold, autofoldtype, autofolddec, autounfold, autounfoldtype, autounfolddec
     -- ** Mutual Recursion
-  , unfixdataMutual, unfixdataMutualEx, autofoldMutual, autofoldtypeMutual, autofolddecMutual, autounfoldMutual, autounfoldtypeMutual, autounfolddecMutual
+  , unfixdataMutual, autofoldMutual, autofoldtypeMutual, autofolddecMutual, autounfoldMutual, autounfoldtypeMutual, autounfolddecMutual
     -- ** Primitive Functions
   , autoin, autoout, autohylo
   , autoinMutual, autooutMutual, autohyloMutual
@@ -78,23 +78,14 @@ import Control.Applicative
 -}
 
 -- |
--- @unfixdata t@ provides a declaration of a nonrecursive datatype whose fixpoint is the recursive type @t@.
-unfixdata :: TypeQ -> DecsQ
-unfixdata = unfixdataEx ("Uf","") ("Uf","") ("&","") ("&","")
-
--- |
--- Special version of @unfixdata@. Note that
---
--- > unfixdata = unfixdataEx ("Uf","") ("Uf","") ("&","") ("&","")
-unfixdataEx ::
-    (String,String) -- ^ prefix and suffix of type constructor
- -> (String,String) -- ^ prefix and suffix of data constructor
- -> (String,String) -- ^ prefix and suffix of infix type constructor
- -> (String,String) -- ^ prefix and suffix of infix data constructor
- -> TypeQ -- ^ data type
+-- @unfixdata t n f ds@ provides a declaration of a nonrecursive datatype whose fixpoint is the recursive type @t@, with a deriving declaration with names @ds@.
+unfixdata ::
+    TypeQ -- ^ @t@, recursive datatype
+ -> String -- ^ @s@, name of the new datatype
+ -> (String -> String) -- ^ @f@, how to convert the name of data constructors
+ -> [Name] -- ^ @ds@, derivings
  -> DecsQ -- ^ declaration of a datatype
-unfixdataEx (pretype,suftype) (predata,sufdata) (pretypeinfix,suftypeinfix) (predatainfix,sufdatainfix) t =
-    unfixdataMutualEx (pretype,suftype) (predata,sufdata) (pretypeinfix,suftypeinfix) (predatainfix,sufdatainfix) [t]
+unfixdata t s f ds = unfixdataMutual [(t,s,f,ds)]
 
 autoin ::
     TypeQ -- ^ @u@, nonrecursive datatype
@@ -151,28 +142,21 @@ autounfoldtype u t = autounfoldtypeMutual [(u,t)] 0
 autounfolddec :: String -> TypeQ -> TypeQ -> DecsQ
 autounfolddec = gendec2 autounfold autounfoldtype
 
+
 -- |
 -- Mutually recursive version of @unfixdata@. Note that
 --
--- > unfixdata t = unfixdataMutual [t]
-unfixdataMutual :: [TypeQ] -> DecsQ
-unfixdataMutual = unfixdataMutualEx ("Uf","") ("Uf","") ("&","") ("&","")
-
--- |
--- Special version of @unfixdataMutual@. Note that
---
--- > unfixdataMutual = unfixdataMutualEx ("Uf","") ("Uf","") ("&","") ("&","")
-unfixdataMutualEx ::
-    (String,String) -- ^ prefix and suffix of type constructor
- -> (String,String) -- ^ prefix and suffix of data constructor
- -> (String,String) -- ^ prefix and suffix of infix type constructor
- -> (String,String) -- ^ prefix and suffix of infix data constructor
- -> [TypeQ] -- ^ recursive datatypes
- -> DecsQ -- ^ declarations of data
-unfixdataMutualEx pstype psdata pstypeinfix psdatainfix ts = do
-    tpls <- mapM (\t -> type2typex [] [] t >>= applyFixed 0) =<< sequence ts
+-- > unfixdata t s f ds = unfixdataMutual [(t,s,f,ds)]
+unfixdataMutual ::
+    [(TypeQ,String,String->String,[Name])] -- ^ @[(t0,s0,f0,ds0), ...]@
+ -> DecsQ -- ^ declarations of a datatype
+unfixdataMutual tsfdss = do
+    tpls <- mapM (\(t,_,_,_) -> t >>= type2typex [] [] >>= applyFixed 0) tsfdss
     let nms = map (\(_, DataTx nm _ _) -> nm) tpls
         cxss = map (\(_, DataTx _ _ cxs) -> cxs) tpls
+        ss = map (\(_,s,_,_) -> s) tsfdss
+        fs = map (\(_,_,f,_) -> f) tsfdss
+        dss = map (\(_,_,_,ds) -> ds) tsfdss
         l = length tpls
         (n,_) = head tpls
         modifytx (DataTx nm vmp cxs) = case elemIndex nm nms of
@@ -186,22 +170,22 @@ unfixdataMutualEx pstype psdata pstypeinfix psdatainfix ts = do
         modifytx (ListTx tx) = ListTx (modifytx tx)
         modifytx tx = tx
         modifycx (nm,txs) = (nm,map modifytx txs)
-        go (nm,txs) = do
+        go (f,(nm,txs)) = do
               ts' <- map ((,) NotStrict) <$> mapM (typex2type . modifytx) txs
-              return $ NormalC (datanm nm) ts'
-        ho (nm,cns) = DataD [] (typenm nm) (map var [0..n-1] ++ map self [0..l-1]) cns []
-    cnss <- mapM (mapM go) cxss
-    return $ map ho (zip nms cnss)
-    where typenm = modifyname pstype pstypeinfix
-          datanm = modifyname psdata psdatainfix
-          var i = PlainTV $ mkName ("t" ++ show i)
+              return $ NormalC newnm ts'
+            where newnm = mkName (f (nameBase nm))
+        ho (nm,s,cns,ds) = DataD [] newnm (map var [0..n-1] ++ map self [0..l-1]) cns ds
+            where newnm = if s=="" then mkName (modifyname ("Uf","") ("&","") (nameBase nm)) else mkName s
+    cnss <- mapM (mapM go . zip fs) cxss
+    return $ map ho (zip4 nms ss cnss dss)
+    where var i = PlainTV $ mkName ("t" ++ show i)
           self i = PlainTV $ mkName ("self" ++ show i)
 
 -- |
 -- Mutually recursive version of @autoin@.
 autoinMutual ::
     [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is an nonrecursive datatype and @ti@ is a fixpoint of @ui@
- -> Int -- ^ @k@; an index
+ -> Int -- ^ @k@, index
  -> ExpQ -- ^ @in@ for @uk@
 autoinMutual uts k = do
     cxsus <- mapM (\(u,_) -> u >>= type2typex [] [] >>= applyFixed 0 >>= return . getcxs . snd) uts
@@ -220,7 +204,7 @@ autoinMutual uts k = do
 -- Mutually recursive version of @autoout@.
 autooutMutual ::
     [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is an nonrecursive datatype and @ti@ is a fixpoint of @ui@
- -> Int -- ^ @k@; an index
+ -> Int -- ^ @k@, index
  -> ExpQ -- ^ @out@ for @uk@
 autooutMutual uts k = do
     cxsus <- mapM (\(u,_) -> u >>= type2typex [] [] >>= applyFixed 0 >>= return . getcxs . snd) uts
@@ -239,7 +223,7 @@ autooutMutual uts k = do
 -- Mutually recursive version of @autohylo@.
 autohyloMutual ::
     [TypeQ] -- ^ @[u0, .., un]@; @ui@ is an nonrecursive datatype
- -> Int -- ^ @k@; an index
+ -> Int -- ^ @k@, index
  -> ExpQ -- ^ @hylo@ for @uk@
 autohyloMutual us k = do
     ms <- mapM (\u -> u >>= type2typex [] [] >>= applyFixed 0 >>= \(m,DataTx _ _ _) -> return m) us
@@ -267,7 +251,7 @@ autohyloMutual us k = do
 -- @autofoldMutual ts@ provides a folding function for the mutually recursive types @ts@
 autofoldMutual ::
     [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is an nonrecursive datatype and @ti@ is a fixpoint of @ui@
- -> Int -- ^ @k@; an index
+ -> Int -- ^ @k@, index
  -> ExpQ -- ^ @fold@ for @uk@
 autofoldMutual uts k = do
     os <- mapM (autooutMutual uts) [0..n-1]
@@ -299,7 +283,7 @@ autofolddecMutual = gendec2 autofoldMutual autofoldtypeMutual
 -- @autounfoldMutual ts@ provides an unfolding function for the mutually recursive types @ts@.
 autounfoldMutual ::
     [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is an nonrecursive datatype and @ti@ is a fixpoint of @ui@
- -> Int -- ^ @k@; an index
+ -> Int -- ^ @k@, index
  -> ExpQ -- ^ @unfold@ for @uk@
 autounfoldMutual uts k = do
     is <- mapM (autoinMutual uts) [0..n-1]

@@ -25,8 +25,8 @@ g ((m,n) :&* k) = m+n+k
 gg :: Int
 gg = foldsth g ff
 
-data Rose x = Rose x (Forest x)
-data Forest x = Forest [Rose x]
+data Rose x = Rose x (Forest x) deriving Show
+data Forest x = Forest [Rose x] deriving Show
 
 unfixdataMutual [[t|Rose|], [t|Forest|]]
 autofolddecMutual "foldrose" [([t|UfRose|],[t|Rose|]),([t|UfForest|],[t|Forest|])] 0
@@ -39,6 +39,5 @@ unfixdataMutual [[t|CrazyA|], [t|CrazyB|], [t|CrazyC|]]
 autofolddecMutual "foldcrc" [([t|UfCrazyA|],[t|CrazyA|]),([t|UfCrazyB|],[t|CrazyB|]),([t|UfCrazyC|],[t|CrazyC|])] 2
 autounfolddecMutual "unfoldcrc" [([t|UfCrazyA|],[t|CrazyA|]),([t|UfCrazyB|],[t|CrazyB|]),([t|UfCrazyC|],[t|CrazyC|])] 2
 
-main :: IO ()
-main = print gg
+main = print 0
 

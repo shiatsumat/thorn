@@ -20,6 +20,7 @@ module Data.Thorn.Internal (
   ) where
 
 import Language.Haskell.TH
+import Data.Char
 import Data.List
 import Data.Maybe
 import Control.Monad
@@ -272,9 +273,13 @@ gendec2 f g s a b = do
     t <- g a b
     return [SigD (mkName s) t, ValD (mkNameP s) (NormalB e) []]
 
-modifyname :: (String,String) -> (String,String) -> Name -> Name
-modifyname (pre,suf) (preinfix,sufinfix) nm
-            | elem (head s) ['A'..'Z'] = mkName $ pre ++ s ++ suf
-            | head s == '(' = mkName $ ":" ++ preinfix ++ init (drop 2 s) ++ sufinfix
-            | otherwise = mkName $ ":" ++ preinfix ++ tail s ++ sufinfix
-            where s = nameBase nm
+-- |
+-- @modifyname (pre,suf) (preinfix,sufinfix) s@
+modifyname :: (String,String) -> (String,String) -> String -> String
+modifyname (pre,suf) (preinfix,sufinfix) s
+    | isAlpha (head s) = pre ++ s ++ suf
+    | take 2 s == "(:" = ":" ++ preinfix ++ init (drop 2 s) ++ sufinfix
+    | head s == ':' = ":" ++ preinfix ++ tail s ++ sufinfix
+    | head s == '(' = preinfix ++ init (tail s) ++ sufinfix
+    | otherwise = preinfix ++ s ++ sufinfix
+
