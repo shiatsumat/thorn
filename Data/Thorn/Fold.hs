@@ -29,14 +29,14 @@ import Data.List
 import Control.Applicative
 
 {- $fold
-    Thorn generates folds and unfolds from various kinds of recursive datatypes, including mutually recursive ones.
+    You can generate folds and unfolds from various kinds of recursive datatypes, including mutually recursive ones.
 -}
 
 {- $basic
 
-It's a piece of cake.
+    It's a piece of cake.
 
-Note tht @foldlist@ is analogous with 'foldr' and @unfoldlist@ with 'unfoldr'.
+    Note tht @foldlist@ is analogous with 'foldr' and @unfoldlist@ with 'unfoldr'.
 
 > data List a = Nil | a :* (List a) deriving Show
 > 
@@ -72,9 +72,9 @@ Note tht @foldlist@ is analogous with 'foldr' and @unfoldlist@ with 'unfoldr'.
 
 {- $mutual
 
-It also works for mutual recursion.
+    It also works for mutual recursion.
 
-It's just an extension of simple recursion. Take it easy.
+    Just an extension of simple recursion. Take it easy.
 
 > data Rose x = x :-< (Forest x) deriving Show
 > data Forest x = F [Rose x] deriving Show
@@ -154,13 +154,13 @@ unfixdata t s f ds = unfixdataMutual [(t,s,f,ds)]
 autoin ::
     TypeQ -- ^ @u@, nonrecursive datatype
  -> TypeQ -- ^ @t@, fixpoint of @u@
- -> ExpQ -- ^ function with a type @u x0 .. xn t -> t x0 .. xn@
+ -> ExpQ -- ^ function with a type @u x0 .. xn (t x0 .. xn) -> t x0 .. xn@
 autoin u t = autoinMutual [(u,t)] 0
 
 autoout ::
     TypeQ -- ^ @u@, nonrecursive datatype
  -> TypeQ -- ^ @t@, fixpoint of @u@
- -> ExpQ -- ^ function with a type @t x0 .. xn -> u x0 .. xn t@
+ -> ExpQ -- ^ function with a type @t x0 .. xn -> u x0 .. xn (t x0 .. xn)@
 autoout u t = autooutMutual [(u,t)] 0
 
 autohylo ::
@@ -248,7 +248,7 @@ unfixdataMutual tsfdss = do
 autoinMutual ::
     [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is a nonrecursive datatype and @ti@ is a fixpoint of @ui@
  -> Int -- ^ @k@, index
- -> ExpQ -- ^ function with a type @uk x0 .. xm t0 .. tn -> tk x0 .. xm@
+ -> ExpQ -- ^ function with a type @uk x0 .. xm (t0 x0 .. xm) .. (tn x0 .. xm) -> tk x0 .. xm@
 autoinMutual uts k = do
     cxsus <- mapM (\(u,_) -> u >>= type2typex [] [] >>= applyFixed 0 >>= return . getcxs . snd) uts
     cxsts <- mapM (\(_,t) -> t >>= type2typex [] [] >>= applyFixed 0 >>= return . getcxs . snd) uts
@@ -267,7 +267,7 @@ autoinMutual uts k = do
 autooutMutual ::
     [(TypeQ,TypeQ)] -- ^ @[(u0,t0), .., (un,tn)]@; @ui@ is a nonrecursive datatype and @ti@ is a fixpoint of @ui@
  -> Int -- ^ @k@, index
- -> ExpQ -- ^ function with a type @tk x0 .. xm -> uk x0 .. xm t0 .. tn@
+ -> ExpQ -- ^ function with a type @tk x0 .. xm -> uk x0 .. xm (t0 x0 .. xm) .. (tn x0 .. xm)@
 autooutMutual uts k = do
     cxsus <- mapM (\(u,_) -> u >>= type2typex [] [] >>= applyFixed 0 >>= return . getcxs . snd) uts
     cxsts <- mapM (\(_,t) -> t >>= type2typex [] [] >>= applyFixed 0 >>= return . getcxs . snd) uts

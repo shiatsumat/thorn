@@ -43,7 +43,7 @@ import Control.Applicative
 import Control.Monad.State
 
 {- $functor
-    Thorn generates functors from various kinds of datatypes.
+    You can generate functors from various kinds of datatypes.
 
     Quite surprisingly, it still works for any arities, co\/contra\/free\/fixed-variances, partially applied types, type synonyms, and mutual recursions.
 -}
@@ -97,7 +97,7 @@ import Control.Monad.State
 
 {- $synonym
 
-Interestingly, it works for type synonyms.
+    Interestingly, it works for type synonyms.
 
 > type a :<- b = b -> a
 > varnuf :: [Variance]
@@ -108,7 +108,7 @@ Interestingly, it works for type synonyms.
 
 {- $variance
 
-It works for free-variance and fixed-variance. See how @autofunctorize@ works for free-variance.
+    It works for free-variance and fixed-variance. See how @autofunctorize@ works for free-variance.
 
 > data What a b c = What1 c (a -> c) | What2 a
 > 
@@ -125,7 +125,7 @@ It works for free-variance and fixed-variance. See how @autofunctorize@ works fo
 
 {- $recursive
 
-It works for recursive datatypes.
+    It works for recursive datatypes.
 
 > data List a = Nil | a :* (List a) deriving Show
 > 
@@ -143,7 +143,7 @@ It works for recursive datatypes.
 > testlist :: [Int]
 > testlist = toNormalList $ fmap (+10) (fromNormalList [1..5]) -- [11..15]
 
-It also works for mutually recursive datatypes.
+    It also works for mutually recursive datatypes.
 
 > data Rose a = Rose a (Forest a) deriving Show
 > data Forest a = Forest [Rose a] deriving Show
@@ -227,9 +227,9 @@ data Variance =
     Co
     -- | Contravariance, the dual of covariance.
   | Contra
-    -- | Free-variance, or invariance, being supposed to satisfy either covariance or contravariance.
+    -- | Free-variance, being supposed to satisfy either covariance or contravariance.
   | Free
-    -- | Fixed-variance, or nonvariance, being supposed to satisfy both covariance and contravariance.
+    -- | Fixed-variance, being supposed to satisfy both covariance and contravariance.
   | Fixed deriving (Show, Read)
 
 -- | @v1 `mappend` v2@ means to be supposed to satisfy both @v1@ and @v2@.
